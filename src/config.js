@@ -5,7 +5,7 @@
 export const API_BASE = "https://api.brightsky.dev";
 
 // Anfrage-Geometrie.
-export const DISTANCE_M = 2000; // Ausschnitt, ergibt 5 x 5 Pixel
+export const DISTANCE_M = 20000; // Ausschnitt fuer Karte und Nowcast, ergibt ~41 x 41 Pixel (~40 km)
 export const PAST_MIN = 30; // Historie in der Anfrage
 export const HORIZON_MIN = 120; // Vorhersagefenster
 export const FRAME_MIN = 5; // Laenge eines Frames

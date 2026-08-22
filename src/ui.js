@@ -2,7 +2,8 @@
 // fertiges View-Objekt und schreibt es in das Skelett aus index.html.
 
 import { fmtRate, hhmm, categoryLabel } from "./text.js";
-import { RAIN_MIN_MMH, HORIZON_MIN, FRAME_MIN, PAST_MIN } from "./config.js";
+import { HORIZON_MIN, FRAME_MIN, PAST_MIN, MMH_PER_UNIT, CONFIG } from "./config.js";
+import { categorize } from "./nowcast.js";
 
 const MIN = 60_000;
 const el = (id) => document.getElementById(id);
@@ -17,13 +18,6 @@ const ERR_TEXT = {
   noGeo: "Standort nicht verfügbar, zeige gespeicherten Ort.",
 };
 
-// Ampel-Stufe fuer eine Kachel.
-function levelFor(category) {
-  if (category === "none") return "dry";
-  if (category === "light" || category === "moderate") return "warn";
-  return "alert";
-}
-
 function barReadout(frame) {
   const label = hhmm(frame.validTime);
   if (frame.noData) return `${label} · keine Daten`;
@@ -34,6 +28,7 @@ function barReadout(frame) {
 function makeBar(frame, past) {
   const div = document.createElement("div");
   div.className = "bar";
+  div._frame = frame;
   if (past) div.classList.add("past");
   div.dataset.readout = barReadout(frame);
   div.title = div.dataset.readout;
@@ -57,6 +52,7 @@ function group(cls) {
 }
 
 function renderTimeline(nowcast) {
+  viewNowcast = nowcast;
   const tl = el("timeline");
   hideScrub();
   tl.replaceChildren();
@@ -181,6 +177,7 @@ function scrubAt(clientX) {
   e.line.style.height = r.height + "px";
   e.readout.classList.add("on");
   e.line.classList.add("on");
+  if (bar._frame) renderRadar(bar._frame, false);
 }
 
 function wireScrub() {
@@ -203,6 +200,7 @@ function wireScrub() {
   const end = () => {
     active = false;
     hideScrub();
+    renderRadarCurrent();
   };
   tl.addEventListener("pointerup", end);
   tl.addEventListener("pointercancel", end);
@@ -211,29 +209,125 @@ function wireScrub() {
   });
 }
 
-function renderTiles(nowcast) {
-  const tilesEl = el("tiles");
-  const map = { m10: "m10", m20: "m20", m120: "m120" };
-  for (const key of Object.keys(map)) {
-    const w = nowcast.windows[key];
-    const tile = tilesEl.querySelector(`[data-window="${key}"]`);
-    const textEl = tile.querySelector(".tile-text");
-    tile.classList.remove("cat-none", "cat-light", "cat-moderate", "cat-strong", "cat-extreme");
+// Regen-Radar: farbige Niederschlagszellen aus dem DWD-Raster, Standort in der
+// Mitte. Kein Kartenhintergrund (keine Fremd-Requests). Beim Scrubben der
+// Zeitleiste zeigt die Karte den jeweiligen Frame, sonst den aktuellen.
+let viewNowcast = null;
+let radarFrame = null;
+let radarObserver = null;
 
-    if (nowcast.coverage === "none" || w.maxMmh < RAIN_MIN_MMH) {
-      tile.dataset.level = "dry";
-      tile.classList.add("cat-none");
-      textEl.innerHTML = "trocken";
-    } else {
-      tile.dataset.level = levelFor(w.category);
-      tile.classList.add("cat-" + w.category);
-      const ongoing = w.firstRainAt && w.firstRainAt.getTime() <= nowcast.now.getTime();
-      const when = ongoing ? " jetzt" : w.firstRainAt ? ` ab ${hhmm(w.firstRainAt)}` : "";
-      textEl.innerHTML = `${cap(categoryLabel(w.category))}${when}<span class="tile-rate">${fmtRate(
-        w.maxMmh
-      )} mm/h</span>`;
+function cssColors() {
+  const s = getComputedStyle(document.documentElement);
+  const get = (n) => s.getPropertyValue(n).trim();
+  return {
+    light: get("--cat-light"),
+    moderate: get("--cat-moderate"),
+    strong: get("--cat-strong"),
+    extreme: get("--cat-extreme"),
+  };
+}
+
+function drawRadar(canvas, grid, center) {
+  const ctx = canvas.getContext("2d");
+  const rows = Array.isArray(grid) ? grid.length : 0;
+  const cols = rows && Array.isArray(grid[0]) ? grid[0].length : 0;
+  const w = canvas.clientWidth || 300;
+  const h = canvas.clientHeight || w;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.round(w * dpr);
+  canvas.height = Math.round(h * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  if (!rows || !cols) return;
+
+  const cw = w / cols;
+  const ch = h / rows;
+  const col = cssColors();
+  const colorFor = (cat) =>
+    cat === "light" ? col.light : cat === "moderate" ? col.moderate : cat === "strong" ? col.strong : cat === "extreme" ? col.extreme : null;
+
+  ctx.globalAlpha = 0.85;
+  for (let r = 0; r < rows; r++) {
+    const row = grid[r];
+    if (!Array.isArray(row)) continue;
+    for (let c = 0; c < cols; c++) {
+      const v = row[c];
+      if (v === null || v === undefined) {
+        ctx.globalAlpha = 0.12;
+        ctx.fillStyle = "#808080";
+        ctx.fillRect(c * cw, r * ch, cw + 0.6, ch + 0.6);
+        ctx.globalAlpha = 0.85;
+        continue;
+      }
+      const mmh = v * MMH_PER_UNIT;
+      if (mmh < CONFIG.RAIN_MIN_MMH) continue; // trocken: transparent
+      const color = colorFor(categorize(mmh, CONFIG));
+      if (!color) continue;
+      ctx.fillStyle = color;
+      ctx.fillRect(c * cw, r * ch, cw + 0.6, ch + 0.6);
     }
   }
+  ctx.globalAlpha = 1;
+
+  // Reichweitenring und Standortmarke.
+  const cx = (center.col + 0.5) * cw;
+  const cy = (center.row + 0.5) * ch;
+  ctx.strokeStyle = "rgba(127,127,127,0.35)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(cx, cy, Math.min(w, h) * 0.25, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(cx, cy, 4.5, 0, Math.PI * 2);
+  ctx.fillStyle = "#ffffff";
+  ctx.fill();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = "rgba(0,0,0,0.55)";
+  ctx.stroke();
+}
+
+function renderRadar(frame, isNow) {
+  const canvas = el("radar");
+  if (!canvas || !frame || !viewNowcast) return;
+  radarFrame = { frame, isNow };
+  drawRadar(canvas, frame.grid, viewNowcast.center);
+  const badge = el("radar-time");
+  if (badge) badge.textContent = isNow ? "jetzt" : hhmm(frame.validTime);
+  ensureRadarObserver(canvas);
+}
+
+function renderRadarCurrent() {
+  if (!viewNowcast) return;
+  const frame = viewNowcast.current ?? viewNowcast.forecast[0] ?? null;
+  if (frame) renderRadar(frame, true);
+}
+
+function ensureRadarObserver(canvas) {
+  if (radarObserver || typeof ResizeObserver === "undefined") return;
+  radarObserver = new ResizeObserver(() => {
+    if (radarFrame) drawRadar(canvas, radarFrame.frame.grid, viewNowcast.center);
+  });
+  radarObserver.observe(canvas);
+}
+
+function renderLegend() {
+  const leg = el("radar-legend");
+  if (!leg || leg.dataset.built) return;
+  const items = [
+    ["light", "leicht"],
+    ["moderate", "mäßig"],
+    ["strong", "stark"],
+    ["extreme", "sehr stark"],
+  ];
+  for (const [catKey, label] of items) {
+    const item = document.createElement("span");
+    item.className = "legend-item";
+    const sw = document.createElement("i");
+    sw.className = "legend-swatch cat-" + catKey;
+    item.append(sw, document.createTextNode(label));
+    leg.append(item);
+  }
+  leg.dataset.built = "1";
 }
 
 function cap(s) {
@@ -357,7 +451,8 @@ export function render(view) {
 
   if (view.nowcast) {
     renderTimeline(view.nowcast);
-    renderTiles(view.nowcast);
+    renderLegend();
+    renderRadarCurrent();
   }
 
   if (view.places) renderPlaces(view.places, view.activePlaceId, view.editing);

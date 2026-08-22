@@ -1,8 +1,10 @@
 # Regenradar
 
 Statische mobile PWA für Safari auf dem iPhone. Beantwortet eine Frage: Wann
-regnet es hier in den nächsten 120 Minuten und wie stark. Ein Screen, keine
-Karte. Datenbasis ist der DWD-Radar-Nowcast (Produkt RV) über die
+regnet es hier in den nächsten 120 Minuten und wie stark. Ein Screen mit einer
+Zeitleiste (per Wischen abtastbar) und darunter einer Radar-Karte des Niederschlags um den
+Standort (aus den DWD-Daten gezeichnet, ohne Kartenhintergrund und ohne
+Fremd-Requests). Datenbasis ist der DWD-Radar-Nowcast (Produkt RV) über die
 [Bright-Sky-API](https://brightsky.dev/).
 
 Kein Backend, kein Framework, kein Bundler, keine Laufzeitabhängigkeiten. Plain
@@ -79,7 +81,7 @@ im Code.
 | Konstante | Wert | Bedeutung |
 |---|---|---|
 | `API_BASE` | `https://api.brightsky.dev` | später auf eigenes Backend umstellbar |
-| `DISTANCE_M` | 2000 | Ausschnitt, ergibt 5 × 5 Pixel |
+| `DISTANCE_M` | 20000 | Ausschnitt für Karte und Nowcast, ergibt ~41 × 41 Pixel (~40 km) |
 | `PAST_MIN` | 30 | Historie in der Anfrage |
 | `HORIZON_MIN` | 120 | Vorhersagefenster |
 | `FRAME_MIN` | 5 | Länge eines Frames |

@@ -9,38 +9,55 @@ import { CONFIG } from "./config.js";
 import { render } from "./ui.js";
 
 const MIN = 60_000;
+const GRID = 41; // wie der echte Ausschnitt (~41x41)
+const C = 20; // Mittelpunkt (Standort)
 
-// Baut eine RadarSeries aus Zentrumswerten, Frame 0 auf `now`.
-function buildSeries(centerValues, { now, runOffsetMin = 0 } = {}) {
-  const frames = centerValues.map((val, i) => {
+// Ein Frame mit einem gauss-foermigen Regengebiet, dessen Zentrum sich bewegt.
+function blobFrame(i, { peak, x0, vx, y0 = C, sigma = 5 }) {
+  const bx = x0 + vx * i;
+  const grid = [];
+  for (let r = 0; r < GRID; r++) {
+    const row = [];
+    for (let c = 0; c < GRID; c++) {
+      const d2 = (c - bx) ** 2 + (r - y0) ** 2;
+      row.push(Math.round(peak * Math.exp(-d2 / (2 * sigma * sigma))));
+    }
+    grid.push(row);
+  }
+  return grid;
+}
+
+// RadarSeries mit ziehendem Regengebiet, Frame 0 auf `now`.
+function blobSeries(now, opts) {
+  const n = 25;
+  const frames = [];
+  for (let i = 0; i < n; i++) {
     const validTime = new Date(now.getTime() + i * 5 * MIN);
-    const grid =
-      val === null
-        ? Array.from({ length: 5 }, () => Array(5).fill(null))
-        : Array.from({ length: 5 }, () => Array(5).fill(val));
-    return { validTime, grid, isForecast: validTime.getTime() > now.getTime() };
-  });
+    frames.push({ validTime, grid: blobFrame(i, opts), isForecast: validTime.getTime() > now.getTime() });
+  }
   return {
     fetchedAt: now,
-    runTime: new Date(now.getTime() - runOffsetMin * MIN),
-    center: { row: 2, col: 2 },
+    runTime: new Date(now.getTime() - (opts.runOffsetMin || 0) * MIN),
+    center: { row: C, col: C },
     frames,
   };
 }
 
-// Szenario: trocken jetzt, dann Regen ab +25 min bis +70 min, danach trocken.
-function rainySeries(now, runOffsetMin = 0) {
-  const values = new Array(25).fill(0);
-  for (let i = 6; i <= 14; i++) values[i] = i < 10 ? 20 : 60; // leicht -> stark
-  return buildSeries(values, { now, runOffsetMin });
+function nullSeries(now) {
+  const frames = [];
+  for (let i = 0; i < 25; i++) {
+    const validTime = new Date(now.getTime() + i * 5 * MIN);
+    const grid = Array.from({ length: GRID }, () => Array(GRID).fill(null));
+    frames.push({ validTime, grid, isForecast: validTime.getTime() > now.getTime() });
+  }
+  return { fetchedAt: now, runTime: now, center: { row: C, col: C }, frames };
 }
 
-// Szenario: es regnet bereits jetzt und noch ca. 40 min weiter.
-function rainNowSeries(now) {
-  const values = new Array(25).fill(0);
-  for (let i = 0; i <= 8; i++) values[i] = 50; // maessig, ab jetzt
-  return buildSeries(values, { now });
-}
+// Regengebiet zieht heran und ueber den Standort (~+40 min), dann weiter.
+const approaching = (now, runOffsetMin = 0) =>
+  blobSeries(now, { peak: 90, x0: 4, vx: 2, runOffsetMin });
+// Regengebiet steht jetzt ueber dem Standort und zieht ab.
+const rainingNow = (now) => blobSeries(now, { peak: 80, x0: C, vx: 1.5 });
 
 const PLACE = { name: "Berlin" };
 const CHIPS = [{ id: "geo", name: "Berlin" }];
@@ -51,58 +68,43 @@ function base(extra) {
 
 export function renderDebug(stateName) {
   const now = new Date();
-
   const ncFrom = (series) => {
     const nowcast = computeNowcast(series, now, CONFIG);
     return { nowcast, summary: summarize(nowcast) };
+  };
+  const show = (state, series, extra = {}) => {
+    const { nowcast, summary } = ncFrom(series);
+    render(base({ state, summary, nowcast, ...extra }));
   };
 
   switch (stateName) {
     case "loading":
       render(base({ state: "loading", summary: null, nowcast: null }));
       return;
-
-    case "ok": {
-      const { nowcast, summary } = ncFrom(rainySeries(now));
-      render(base({ state: "ok", summary, nowcast }));
+    case "ok":
+      show("ok", approaching(now));
       return;
-    }
-    case "rainNow": {
-      const { nowcast, summary } = ncFrom(rainNowSeries(now));
-      render(base({ state: "ok", summary, nowcast }));
+    case "rainNow":
+      show("ok", rainingNow(now));
       return;
-    }
-    case "stale": {
-      const { nowcast, summary } = ncFrom(rainySeries(now, 20));
-      render(base({ state: "stale", summary, nowcast }));
+    case "stale":
+      show("stale", approaching(now, 20));
       return;
-    }
-    case "veryStale": {
-      const { nowcast, summary } = ncFrom(rainySeries(now, 40));
-      render(base({ state: "veryStale", summary, nowcast }));
+    case "veryStale":
+      show("veryStale", approaching(now, 40));
       return;
-    }
-    case "noCoverage": {
-      const { nowcast, summary } = ncFrom(buildSeries(new Array(25).fill(null), { now }));
-      render(base({ state: "noCoverage", summary, nowcast }));
+    case "noCoverage":
+      show("noCoverage", nullSeries(now));
       return;
-    }
-    case "error": {
-      const { nowcast, summary } = ncFrom(rainySeries(now));
-      // Letztes Ergebnis bleibt sichtbar, Banner zeigt Fehler.
-      render(base({ state: "error", summary, nowcast, error: { kind: "http" } }));
+    case "error":
+      show("error", approaching(now), { error: { kind: "http" } });
       return;
-    }
-    case "offline": {
-      const { nowcast, summary } = ncFrom(rainySeries(now));
-      render(base({ state: "offline", summary, nowcast }));
+    case "offline":
+      show("offline", approaching(now));
       return;
-    }
-    case "noGeo": {
-      const { nowcast, summary } = ncFrom(rainySeries(now));
-      render(base({ state: "noGeo", summary, nowcast }));
+    case "noGeo":
+      show("noGeo", approaching(now));
       return;
-    }
     default:
       render(base({ state: "error", summary: null, nowcast: null, error: { kind: "shape" } }));
   }

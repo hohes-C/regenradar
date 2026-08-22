@@ -319,64 +319,67 @@ body[data-state="veryStale"] .status {
   color: var(--text);
 }
 
-/* Kacheln */
-.tiles {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
+/* Regen-Radar */
+.radar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
-.tile {
+.radar-canvas-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 12px;
-  min-height: 92px;
+  overflow: hidden;
+}
+.radar-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.radar-time {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 2px 8px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 75%, transparent);
+  border: 1px solid var(--line);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.radar-legend {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.legend-item {
+  display: inline-flex;
+  align-items: center;
   gap: 6px;
 }
-.tile {
-  border-left: 4px solid var(--cat-none);
-}
-.tile.cat-light {
-  border-left-color: var(--cat-light);
-}
-.tile.cat-moderate {
-  border-left-color: var(--cat-moderate);
-}
-.tile.cat-strong {
-  border-left-color: var(--cat-strong);
-}
-.tile.cat-extreme {
-  border-left-color: var(--cat-extreme);
-}
-.tile-title {
-  font-size: 13px;
-  color: var(--muted);
-  font-weight: 600;
-}
-.tile-dot {
+.legend-swatch {
   width: 12px;
   height: 12px;
-  border-radius: 50%;
-  background: var(--dot-dry);
+  border-radius: 3px;
+  background: var(--cat-none);
 }
-.tile[data-level="warn"] .tile-dot {
-  background: var(--dot-warn);
+.legend-swatch.cat-light {
+  background: var(--cat-light);
 }
-.tile[data-level="alert"] .tile-dot {
-  background: var(--dot-alert);
+.legend-swatch.cat-moderate {
+  background: var(--cat-moderate);
 }
-.tile-text {
-  font-size: 15px;
-  font-weight: 600;
-  margin-top: auto;
+.legend-swatch.cat-strong {
+  background: var(--cat-strong);
 }
-.tile-rate {
-  display: block;
-  font-size: 13px;
-  font-weight: 400;
-  color: var(--muted);
+.legend-swatch.cat-extreme {
+  background: var(--cat-extreme);
 }
 
 /* Orte-Chips */
@@ -467,7 +470,7 @@ body[data-state="veryStale"] .status {
 
 body[data-state="loading"] .headline,
 body[data-state="loading"] .timeline-wrap,
-body[data-state="loading"] .tiles {
+body[data-state="loading"] .radar {
   opacity: 0.5;
 }
 

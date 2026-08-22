@@ -41,10 +41,12 @@
           <div class="ticks" id="ticks"></div>
         </section>
 
-        <section class="tiles" id="tiles" aria-label="Zusammenfassung">
-          <div class="tile" data-window="m10"><span class="tile-title">10 Min</span><span class="tile-dot"></span><span class="tile-text"></span></div>
-          <div class="tile" data-window="m20"><span class="tile-title">20 Min</span><span class="tile-dot"></span><span class="tile-text"></span></div>
-          <div class="tile" data-window="m120"><span class="tile-title">2 Std</span><span class="tile-dot"></span><span class="tile-text"></span></div>
+        <section class="radar" aria-label="Regenradar">
+          <div class="radar-canvas-wrap">
+            <canvas id="radar" class="radar-canvas"></canvas>
+            <span class="radar-time" id="radar-time">jetzt</span>
+          </div>
+          <div class="radar-legend" id="radar-legend" aria-hidden="true"></div>
         </section>
       </main>
 

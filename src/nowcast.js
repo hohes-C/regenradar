@@ -221,6 +221,7 @@ export function computeNowcast(series, now, config) {
     ageUncertain,
     freshness,
     coverage,
+    center,
     current,
     forecast,
     past,
