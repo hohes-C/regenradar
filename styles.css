@@ -344,6 +344,11 @@ body[data-state="veryStale"] .status {
 }
 .radar-bg {
   z-index: 0;
+  /* Entsaettigt und via Deckkraft in die Flaechenfarbe eingetoent, damit die
+     bunten OSM-Kacheln als ruhiger Backdrop hinter den Niederschlagsfarben
+     zuruecktreten. Der Wrap-Hintergrund (--surface) scheint durch. */
+  opacity: 0.5;
+  filter: grayscale(1) contrast(0.9) brightness(1.06);
 }
 .radar-canvas {
   z-index: 1;
@@ -375,9 +380,11 @@ body[data-state="veryStale"] .status {
   text-decoration: none;
 }
 @media (prefers-color-scheme: dark) {
-  /* OSM-Standardkacheln sind hell; im Dark Mode gedaempft und invertiert. */
+  /* Im Dark Mode zusaetzlich invertiert, sodass die helle Karte dunkel wird
+     und sich in die dunkle Flaeche einfuegt. */
   .radar-bg {
-    filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9);
+    opacity: 0.5;
+    filter: invert(1) hue-rotate(180deg) grayscale(0.95) brightness(0.9) contrast(0.85);
   }
 }
 .radar-legend {
