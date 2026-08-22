@@ -35,6 +35,13 @@ function rainySeries(now, runOffsetMin = 0) {
   return buildSeries(values, { now, runOffsetMin });
 }
 
+// Szenario: es regnet bereits jetzt und noch ca. 40 min weiter.
+function rainNowSeries(now) {
+  const values = new Array(25).fill(0);
+  for (let i = 0; i <= 8; i++) values[i] = 50; // maessig, ab jetzt
+  return buildSeries(values, { now });
+}
+
 const PLACE = { name: "Berlin" };
 const CHIPS = [{ id: "geo", name: "Berlin" }];
 
@@ -57,6 +64,11 @@ export function renderDebug(stateName) {
 
     case "ok": {
       const { nowcast, summary } = ncFrom(rainySeries(now));
+      render(base({ state: "ok", summary, nowcast }));
+      return;
+    }
+    case "rainNow": {
+      const { nowcast, summary } = ncFrom(rainNowSeries(now));
       render(base({ state: "ok", summary, nowcast }));
       return;
     }

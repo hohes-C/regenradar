@@ -227,8 +227,9 @@ function renderTiles(nowcast) {
     } else {
       tile.dataset.level = levelFor(w.category);
       tile.classList.add("cat-" + w.category);
-      const ab = w.firstRainAt ? ` ab ${hhmm(w.firstRainAt)}` : "";
-      textEl.innerHTML = `${cap(categoryLabel(w.category))}${ab}<span class="tile-rate">${fmtRate(
+      const ongoing = w.firstRainAt && w.firstRainAt.getTime() <= nowcast.now.getTime();
+      const when = ongoing ? " jetzt" : w.firstRainAt ? ` ab ${hhmm(w.firstRainAt)}` : "";
+      textEl.innerHTML = `${cap(categoryLabel(w.category))}${when}<span class="tile-rate">${fmtRate(
         w.maxMmh
       )} mm/h</span>`;
     }
