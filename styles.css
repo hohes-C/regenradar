@@ -1,0 +1,442 @@
+:root {
+  color-scheme: light dark;
+
+  --bg: #f2f4f8;
+  --surface: #ffffff;
+  --text: #0b1020;
+  --muted: #5b6472;
+  --line: #d7dce6;
+
+  /* Kategorie-Farben, helles Blau -> Magenta */
+  --cat-none: #cbd5e1;
+  --cat-light: #93c5fd;
+  --cat-moderate: #3b82f6;
+  --cat-strong: #5b21b6;
+  --cat-extreme: #db2777;
+
+  /* Ampel fuer die Kacheln */
+  --dot-dry: #16a34a;
+  --dot-warn: #f59e0b;
+  --dot-alert: #dc2626;
+
+  --warn-bg: #fdecc4;
+  --warn-fg: #7a5900;
+  --alert-bg: #fbd5d5;
+  --alert-fg: #8a1c1c;
+
+  --radius: 14px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b1020;
+    --surface: #151b2e;
+    --text: #e7ecf5;
+    --muted: #9aa4b8;
+    --line: #2a3350;
+
+    --cat-none: #3a4256;
+    --cat-light: #3b82f6;
+    --cat-moderate: #2563eb;
+    --cat-strong: #7c3aed;
+    --cat-extreme: #ec4899;
+
+    --warn-bg: #3a3210;
+    --warn-fg: #f4d67a;
+    --alert-bg: #3a1414;
+    --alert-fg: #f6a3a3;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 17px;
+  line-height: 1.4;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+.app {
+  max-width: 560px;
+  margin: 0 auto;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+    max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Ortszeile */
+.place-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.place-name {
+  font-size: 18px;
+  font-weight: 600;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.refresh {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+.refresh:active {
+  transform: scale(0.94);
+}
+.refresh-glyph {
+  width: 20px;
+  height: 20px;
+  border: 2.5px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+}
+body[data-state="loading"] .refresh-glyph {
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.status {
+  margin: -6px 0 0;
+  font-size: 14px;
+  color: var(--muted);
+  min-height: 1.2em;
+}
+body[data-state="stale"] .status {
+  color: var(--warn-fg);
+  background: var(--warn-bg);
+  padding: 4px 10px;
+  border-radius: 8px;
+  align-self: flex-start;
+}
+body[data-state="veryStale"] .status {
+  color: var(--alert-fg);
+  background: var(--alert-bg);
+  padding: 4px 10px;
+  border-radius: 8px;
+  align-self: flex-start;
+}
+
+.content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.headline {
+  font-size: 26px;
+  line-height: 1.25;
+  font-weight: 700;
+  margin: 0;
+  min-height: 3.2em; /* bis zu drei Zeilen, kein Layout-Sprung */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+.detail {
+  margin: -8px 0 0;
+  font-size: 16px;
+  color: var(--muted);
+  min-height: 1.4em;
+}
+
+/* Fehler- und Offline-Banner */
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  background: var(--alert-bg);
+  color: var(--alert-fg);
+}
+.banner-text {
+  flex: 1;
+  font-size: 15px;
+}
+.retry {
+  flex: none;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 10px;
+  border: none;
+  background: var(--alert-fg);
+  color: var(--surface);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* Zeitleiste */
+.timeline-wrap {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px 12px 8px;
+}
+.timeline {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 96px;
+}
+.bar-group {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  flex: none;
+  height: 100%;
+}
+.bar-group.forecast {
+  flex: 1;
+}
+.divider {
+  flex: none;
+  width: 2px;
+  align-self: stretch;
+  background: var(--line);
+  margin: 0 4px;
+}
+.bar {
+  flex: 1;
+  min-width: 3px;
+  height: 6%;
+  border-radius: 3px 3px 2px 2px;
+  background: var(--cat-none);
+}
+.bar.past {
+  opacity: 0.45;
+}
+.bar.uncertain {
+  opacity: 0.6;
+}
+.bar.cat-none {
+  background: var(--cat-none);
+}
+.bar.cat-light {
+  background: var(--cat-light);
+}
+.bar.cat-moderate {
+  background: var(--cat-moderate);
+}
+.bar.cat-strong {
+  background: var(--cat-strong);
+}
+.bar.cat-extreme {
+  background: var(--cat-extreme);
+}
+.bar.nodata {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--line),
+    var(--line) 3px,
+    transparent 3px,
+    transparent 6px
+  );
+}
+
+.ticks {
+  position: relative;
+  height: 1.3em;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.tick {
+  position: absolute;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+.tick.now {
+  left: 0;
+  transform: none;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* Kacheln */
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.tile {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px;
+  min-height: 92px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.tile {
+  border-left: 4px solid var(--cat-none);
+}
+.tile.cat-light {
+  border-left-color: var(--cat-light);
+}
+.tile.cat-moderate {
+  border-left-color: var(--cat-moderate);
+}
+.tile.cat-strong {
+  border-left-color: var(--cat-strong);
+}
+.tile.cat-extreme {
+  border-left-color: var(--cat-extreme);
+}
+.tile-title {
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 600;
+}
+.tile-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--dot-dry);
+}
+.tile[data-level="warn"] .tile-dot {
+  background: var(--dot-warn);
+}
+.tile[data-level="alert"] .tile-dot {
+  background: var(--dot-alert);
+}
+.tile-text {
+  font-size: 15px;
+  font-weight: 600;
+  margin-top: auto;
+}
+.tile-rate {
+  display: block;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+/* Orte-Chips */
+.places {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.chip {
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 22px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 15px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.chip[aria-current="true"] {
+  background: var(--cat-moderate);
+  border-color: var(--cat-moderate);
+  color: #fff;
+}
+.chip.add {
+  font-weight: 700;
+}
+.chip.edit-on {
+  border-style: dashed;
+}
+.chip-del {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+}
+
+.footer {
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+  padding-top: 4px;
+}
+
+/* Formular zum Ort hinzufuegen */
+.place-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px;
+}
+.place-form input {
+  font-size: 16px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--text);
+}
+.place-form .row {
+  display: flex;
+  gap: 8px;
+}
+.place-form button {
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 15px;
+  cursor: pointer;
+}
+.place-form button.primary {
+  background: var(--cat-moderate);
+  border-color: var(--cat-moderate);
+  color: #fff;
+  font-weight: 600;
+}
+
+body[data-state="loading"] .headline,
+body[data-state="loading"] .timeline-wrap,
+body[data-state="loading"] .tiles {
+  opacity: 0.5;
+}
+
+[hidden] {
+  display: none !important;
+}

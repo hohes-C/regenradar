@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Regenradar</title>
+    <meta name="description" content="Regen-Nowcast fuer die naechsten 2 Stunden, Datenbasis DWD via Bright Sky." />
+
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Regen" />
+    <link rel="apple-touch-icon" href="icons/icon-180.png" />
+
+    <meta name="theme-color" content="#f2f4f8" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0b1020" media="(prefers-color-scheme: dark)" />
+
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body data-state="loading">
+    <div class="app">
+      <header class="place-bar">
+        <div class="place-name" id="place-name">Aktueller Standort</div>
+        <button class="refresh" id="refresh" type="button" aria-label="Aktualisieren">
+          <span class="refresh-glyph" aria-hidden="true"></span>
+        </button>
+      </header>
+      <p class="status" id="status">&nbsp;</p>
+
+      <main class="content">
+        <h1 class="headline" id="headline">&nbsp;</h1>
+        <p class="detail" id="detail"></p>
+
+        <div class="banner" id="banner" hidden>
+          <span class="banner-text" id="banner-text"></span>
+          <button class="retry" id="retry" type="button">Erneut versuchen</button>
+        </div>
+
+        <section class="timeline-wrap" aria-label="Zeitleiste">
+          <div class="timeline" id="timeline"></div>
+          <div class="ticks" id="ticks"></div>
+        </section>
+
+        <section class="tiles" id="tiles" aria-label="Zusammenfassung">
+          <div class="tile" data-window="m10"><span class="tile-title">10 Min</span><span class="tile-dot"></span><span class="tile-text"></span></div>
+          <div class="tile" data-window="m20"><span class="tile-title">20 Min</span><span class="tile-dot"></span><span class="tile-text"></span></div>
+          <div class="tile" data-window="m120"><span class="tile-title">2 Std</span><span class="tile-dot"></span><span class="tile-text"></span></div>
+        </section>
+      </main>
+
+      <nav class="places" id="places" aria-label="Orte"></nav>
+
+      <footer class="footer">Datenbasis: Deutscher Wetterdienst, via Bright Sky</footer>
+    </div>
+
+    <script type="module" src="src/main.js"></script>
+  </body>
+</html>

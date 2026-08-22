@@ -1,0 +1,14 @@
+{
+  "name": "regenradar",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Regenradar Nowcast PWA, Stufe 1. Statische App, spricht direkt mit Bright Sky.",
+  "scripts": {
+    "test": "node --test",
+    "explore": "node scripts/explore.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

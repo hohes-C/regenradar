@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Regentropfen">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1e3a8a" />
+      <stop offset="1" stop-color="#0b1020" />
+    </linearGradient>
+    <linearGradient id="drop" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#93c5fd" />
+      <stop offset="1" stop-color="#3b82f6" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)" />
+  <!-- Motiv innerhalb der sicheren Zone (ca. 80% zentriert) fuer maskable -->
+  <path fill="url(#drop)" d="M256 150 C 256 150, 178 255, 178 312 a78 78 0 0 0 156 0 C 334 255, 256 150, 256 150 Z" />
+  <ellipse cx="224" cy="304" rx="21" ry="32" fill="#ffffff" opacity="0.35" />
+</svg>
