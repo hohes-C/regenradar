@@ -224,6 +224,8 @@ function cssColors() {
     moderate: get("--cat-moderate"),
     strong: get("--cat-strong"),
     extreme: get("--cat-extreme"),
+    text: get("--text"),
+    surface: get("--surface"),
   };
 }
 
@@ -284,6 +286,61 @@ function drawRadar(canvas, grid, center) {
   ctx.lineWidth = 2;
   ctx.strokeStyle = "rgba(0,0,0,0.55)";
   ctx.stroke();
+
+  // Metrischer Maßstab. DWD RV ist ein 1-km-Raster, also 1 Zelle = 1 km und cw
+  // sind exakt die Pixel pro Kilometer. Kein Projektionsfehler.
+  drawScaleBar(ctx, w, h, cw, col);
+}
+
+function drawScaleBar(ctx, w, h, pxPerKm, col) {
+  // Zielbreite ~28 % der Karte, auf runde Kilometer gebracht.
+  const targetKm = (w * 0.28) / pxPerKm;
+  const steps = [1, 2, 5, 10, 20, 50];
+  let km = steps[0];
+  for (const s of steps) if (s <= targetKm) km = s;
+  const barPx = km * pxPerKm;
+  const pad = 10;
+  const x0 = pad;
+  const x1 = pad + barPx;
+  const y = h - pad;
+  const cap = 5; // Höhe der Endmarken
+  const path = () => {
+    ctx.beginPath();
+    ctx.moveTo(x0, y);
+    ctx.lineTo(x1, y);
+    ctx.moveTo(x0, y - cap);
+    ctx.lineTo(x0, y);
+    ctx.moveTo(x1, y - cap);
+    ctx.lineTo(x1, y);
+  };
+  ctx.save();
+  ctx.lineCap = "butt";
+  // Halo in Flächenfarbe für Kontrast über hellen wie dunklen Zellen.
+  ctx.strokeStyle = col.surface;
+  ctx.globalAlpha = 0.9;
+  ctx.lineWidth = 4;
+  path();
+  ctx.stroke();
+  // Balken in Textfarbe.
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = col.text;
+  ctx.lineWidth = 1.5;
+  path();
+  ctx.stroke();
+  // Beschriftung mit gleichem Halo.
+  const label = km + " km";
+  ctx.font = "600 11px system-ui, -apple-system, sans-serif";
+  ctx.textBaseline = "bottom";
+  ctx.textAlign = "left";
+  ctx.lineJoin = "round";
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = col.surface;
+  ctx.globalAlpha = 0.9;
+  ctx.strokeText(label, x0, y - cap - 2);
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = col.text;
+  ctx.fillText(label, x0, y - cap - 2);
+  ctx.restore();
 }
 
 function renderRadar(frame, isNow) {
