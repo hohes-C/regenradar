@@ -51,6 +51,23 @@ function placeName(id) {
   return state.places.find((p) => p.id === id)?.name ?? "Ort";
 }
 
+// Kartenanker unabhaengig von den (evtl. gecachten) Radardaten. Fuer gespeicherte
+// Orte synchron bekannt; fuer "geo" aus dem gemerkten Standort-Key (gerundet).
+// Faellt auf die coords der aktuellen RadarSeries zurueck.
+function activeCoords() {
+  if (state.activeId === "geo") {
+    const key = state.geoName?.key;
+    if (typeof key === "string") {
+      const [lat, lon] = key.split(",").map(Number);
+      if (Number.isFinite(lat) && Number.isFinite(lon)) return { lat, lon };
+    }
+  } else {
+    const p = state.places.find((x) => x.id === state.activeId);
+    if (p) return { lat: p.lat, lon: p.lon };
+  }
+  return state.render?.nowcast?.coords ?? null;
+}
+
 function visualState(nowcast) {
   if (nowcast.coverage === "none") return "noCoverage";
   if (nowcast.freshness === "veryStale") return "veryStale";
@@ -73,6 +90,7 @@ function baseView(extra) {
     editing: state.editing,
     summary: state.render?.summary ?? null,
     nowcast: state.render?.nowcast ?? null,
+    coords: activeCoords(),
     ...extra,
   };
 }

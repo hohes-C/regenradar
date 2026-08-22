@@ -213,6 +213,7 @@ function wireScrub() {
 // OpenStreetMap-Kachelhintergrund, Standort in der Mitte. Beim Scrubben der
 // Zeitleiste zeigt die Karte den jeweiligen Frame, sonst den aktuellen.
 let viewNowcast = null;
+let mapCoords = null;
 let radarFrame = null;
 let radarObserver = null;
 
@@ -366,7 +367,7 @@ function renderMapBackground(grid) {
   const canvas = el("radar-bg");
   if (!canvas || !viewNowcast) return;
   const ctx = canvas.getContext("2d");
-  const coords = viewNowcast.coords;
+  const coords = mapCoords ?? viewNowcast.coords;
   const center = viewNowcast.center;
   const rows = Array.isArray(grid) ? grid.length : 0;
   const cols = rows && Array.isArray(grid[0]) ? grid[0].length : 0;
@@ -596,6 +597,7 @@ export function render(view) {
     banner.hidden = true;
   }
 
+  mapCoords = view.coords ?? null;
   if (view.nowcast) {
     renderTimeline(view.nowcast);
     renderLegend();
