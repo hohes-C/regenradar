@@ -24,14 +24,22 @@ function levelFor(category) {
   return "alert";
 }
 
+function barReadout(frame) {
+  const label = hhmm(frame.validTime);
+  if (frame.noData) return `${label} · keine Daten`;
+  if (!frame.isRain) return `${label} · trocken`;
+  return `${label} · ${cap(categoryLabel(frame.category))} ${fmtRate(frame.maxMmh)} mm/h`;
+}
+
 function makeBar(frame, past) {
   const div = document.createElement("div");
   div.className = "bar";
   if (past) div.classList.add("past");
+  div.dataset.readout = barReadout(frame);
+  div.title = div.dataset.readout;
   if (frame.noData) {
     div.classList.add("nodata");
     div.style.height = "100%";
-    div.title = "keine Daten";
     return div;
   }
   div.classList.add("cat-" + frame.category);
@@ -39,7 +47,6 @@ function makeBar(frame, past) {
   const capped = Math.min(frame.rateMmh, 10);
   const pct = frame.isRain ? Math.max(10, (capped / 10) * 100) : 6;
   div.style.height = pct + "%";
-  div.title = `${hhmm(frame.validTime)} · ${fmtRate(frame.maxMmh)} mm/h`;
   return div;
 }
 
@@ -51,6 +58,7 @@ function group(cls) {
 
 function renderTimeline(nowcast) {
   const tl = el("timeline");
+  hideScrub();
   tl.replaceChildren();
 
   const pastCount = Math.round(PAST_MIN / FRAME_MIN);
@@ -70,32 +78,137 @@ function renderTimeline(nowcast) {
   for (const f of nowcast.forecast) forecastGroup.append(makeBar(f, false));
   tl.append(forecastGroup);
 
-  positionTicks(nowcast, forecastGroup);
+  observeTicks(nowcast.now, forecastGroup);
+  wireScrub();
 }
 
-// Zeit-Ticks alle 30 Minuten, ausgerichtet an der Vorhersage-Region.
-function positionTicks(nowcast, forecastGroup) {
+// Ticks werden bei jeder Groessenaenderung der Vorhersage-Region neu gesetzt,
+// damit spaeter Reflow (z. B. Scrollbar, Schriftwechsel) sie nicht aus dem Kasten
+// schiebt. Positionen sind zusaetzlich auf die Kastenbreite geclampt.
+let ticksObserver = null;
+let ticksState = null;
+
+function observeTicks(now, forecastGroup) {
+  ticksState = { now, forecastGroup };
+  positionTicks(now, forecastGroup);
+  if (typeof ResizeObserver === "undefined") return;
+  if (!ticksObserver) {
+    ticksObserver = new ResizeObserver(() => {
+      if (ticksState) positionTicks(ticksState.now, ticksState.forecastGroup);
+    });
+  } else {
+    ticksObserver.disconnect();
+  }
+  ticksObserver.observe(forecastGroup);
+}
+
+function positionTicks(now, forecastGroup) {
   const ticks = el("ticks");
   ticks.replaceChildren();
 
-  const wrapRect = ticks.getBoundingClientRect();
+  const ticksRect = ticks.getBoundingClientRect();
+  const maxW = ticks.clientWidth || 1;
   const fgRect = forecastGroup.getBoundingClientRect();
-  const left = fgRect.left - wrapRect.left;
+  const left = fgRect.left - ticksRect.left;
   const width = fgRect.width || 1;
+  const clamp = (v) => Math.max(0, Math.min(v, maxW));
 
-  const addTick = (label, offsetPx, isNow) => {
+  const addTick = (label, offsetPx, { isNow = false, transform = "translateX(-50%)" } = {}) => {
     const t = document.createElement("span");
     t.className = "tick" + (isNow ? " now" : "");
     t.textContent = label;
-    t.style.left = offsetPx + "px";
+    t.style.left = clamp(offsetPx) + "px";
+    t.style.transform = transform;
     ticks.append(t);
   };
 
-  addTick("jetzt", left, true);
+  addTick("jetzt", left, { isNow: true, transform: "none" });
   for (const m of [30, 60, 90, HORIZON_MIN]) {
     const frac = m / HORIZON_MIN;
-    addTick(hhmm(new Date(nowcast.now.getTime() + m * MIN)), left + frac * width, false);
+    const transform = m === HORIZON_MIN ? "translateX(-100%)" : "translateX(-50%)";
+    addTick(hhmm(new Date(now.getTime() + m * MIN)), left + frac * width, { transform });
   }
+}
+
+// Scrubbing: Finger oder Maus ueber die Leiste zeigt Zeit und Intensitaet des
+// beruehrten Frames. Elemente werden einmalig erzeugt, Listener einmalig verdrahtet.
+let scrubWired = false;
+
+function scrubEls() {
+  const wrap = document.querySelector(".timeline-wrap");
+  if (!wrap) return null;
+  if (!wrap.querySelector(".scrub-readout")) {
+    const line = document.createElement("div");
+    line.className = "scrub-line";
+    const readout = document.createElement("div");
+    readout.className = "scrub-readout";
+    wrap.append(line, readout);
+  }
+  return {
+    wrap,
+    line: wrap.querySelector(".scrub-line"),
+    readout: wrap.querySelector(".scrub-readout"),
+  };
+}
+
+function hideScrub() {
+  const e = scrubEls();
+  if (!e) return;
+  e.readout.classList.remove("on");
+  e.line.classList.remove("on");
+}
+
+function scrubAt(clientX) {
+  const tl = el("timeline");
+  const e = scrubEls();
+  if (!e) return;
+  const r = tl.getBoundingClientRect();
+  const x = Math.max(r.left + 1, Math.min(clientX, r.right - 1));
+  const bar = document.elementFromPoint(x, r.bottom - 3)?.closest?.(".bar");
+  if (!bar || !tl.contains(bar)) {
+    hideScrub();
+    return;
+  }
+  const br = bar.getBoundingClientRect();
+  const wr = e.wrap.getBoundingClientRect();
+  e.readout.textContent = bar.dataset.readout || "";
+  const half = Math.min(90, (e.readout.offsetWidth || 80) / 2);
+  let cx = br.left + br.width / 2 - wr.left;
+  cx = Math.max(half + 4, Math.min(cx, wr.width - half - 4));
+  e.readout.style.left = cx + "px";
+  e.line.style.left = br.left + br.width / 2 - wr.left + "px";
+  e.line.style.top = r.top - wr.top + "px";
+  e.line.style.height = r.height + "px";
+  e.readout.classList.add("on");
+  e.line.classList.add("on");
+}
+
+function wireScrub() {
+  if (scrubWired) return;
+  scrubWired = true;
+  const tl = el("timeline");
+  let active = false;
+  tl.addEventListener("pointerdown", (ev) => {
+    active = true;
+    try {
+      tl.setPointerCapture(ev.pointerId);
+    } catch {
+      /* egal */
+    }
+    scrubAt(ev.clientX);
+  });
+  tl.addEventListener("pointermove", (ev) => {
+    if (active || ev.pointerType === "mouse") scrubAt(ev.clientX);
+  });
+  const end = () => {
+    active = false;
+    hideScrub();
+  };
+  tl.addEventListener("pointerup", end);
+  tl.addEventListener("pointercancel", end);
+  tl.addEventListener("pointerleave", (ev) => {
+    if (ev.pointerType === "mouse") end();
+  });
 }
 
 function renderTiles(nowcast) {

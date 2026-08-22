@@ -204,12 +204,46 @@ body[data-state="veryStale"] .status {
   border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 12px 12px 8px;
+  position: relative;
 }
 .timeline {
   display: flex;
   align-items: flex-end;
   gap: 2px;
   height: 96px;
+  touch-action: none;
+}
+.scrub-line {
+  position: absolute;
+  width: 2px;
+  transform: translateX(-50%);
+  background: var(--text);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+.scrub-line.on {
+  opacity: 0.4;
+}
+.scrub-readout {
+  position: absolute;
+  top: 2px;
+  transform: translateX(-50%);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.08s;
+  z-index: 2;
+}
+.scrub-readout.on {
+  opacity: 1;
 }
 .bar-group {
   display: flex;
