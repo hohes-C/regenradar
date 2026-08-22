@@ -334,12 +334,22 @@ body[data-state="veryStale"] .status {
   border-radius: var(--radius);
   overflow: hidden;
 }
+.radar-bg,
 .radar-canvas {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100%;
   height: 100%;
 }
+.radar-bg {
+  z-index: 0;
+}
+.radar-canvas {
+  z-index: 1;
+}
 .radar-time {
+  z-index: 2;
   position: absolute;
   top: 8px;
   left: 8px;
@@ -350,6 +360,25 @@ body[data-state="veryStale"] .status {
   font-size: 13px;
   font-weight: 600;
   color: var(--text);
+}
+.radar-attrib {
+  position: absolute;
+  right: 6px;
+  bottom: 4px;
+  z-index: 2;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.4;
+  text-decoration: none;
+}
+@media (prefers-color-scheme: dark) {
+  /* OSM-Standardkacheln sind hell; im Dark Mode gedaempft und invertiert. */
+  .radar-bg {
+    filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9);
+  }
 }
 .radar-legend {
   display: flex;

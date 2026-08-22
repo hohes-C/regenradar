@@ -2,13 +2,14 @@
 
 Statische mobile PWA für Safari auf dem iPhone. Beantwortet eine Frage: Wann
 regnet es hier in den nächsten 120 Minuten und wie stark. Ein Screen mit einer
-Zeitleiste (per Wischen abtastbar) und darunter einer Radar-Karte des Niederschlags um den
-Standort (aus den DWD-Daten gezeichnet, ohne Kartenhintergrund und ohne
-Fremd-Requests). Datenbasis ist der DWD-Radar-Nowcast (Produkt RV) über die
-[Bright-Sky-API](https://brightsky.dev/).
+Zeitleiste (per Wischen abtastbar) und darunter einer Radar-Karte des
+Niederschlags um den Standort (aus den DWD-Daten gezeichnet, über einem
+OpenStreetMap-Kachelhintergrund). Datenbasis ist der DWD-Radar-Nowcast
+(Produkt RV) über die [Bright-Sky-API](https://brightsky.dev/).
 
 Kein Backend, kein Framework, kein Bundler, keine Laufzeitabhängigkeiten. Plain
-HTML, CSS und ES-Module. Die App spricht direkt mit `api.brightsky.dev`.
+HTML, CSS und ES-Module. Die App spricht direkt mit `api.brightsky.dev` und lädt
+Kartenkacheln von `tile.openstreetmap.org`.
 
 ## Aufbau
 
@@ -158,8 +159,18 @@ keine Anfragen, solange die App nicht sichtbar ist (beides in `main.js`
 umgesetzt).
 
 Der Ortsname des automatischen Standorts kommt aus dem Bright-Sky-Endpoint
-`/sources` (nächstgelegene DWD-Station, z. B. "Berlin-Alexanderplatz"). Das bleibt
-bei der einen erlaubten API; es geht keine Position an Dritte. Selbst angelegte
-Orte behalten den eingegebenen Namen.
+`/sources` (nächstgelegene DWD-Station, z. B. "Berlin-Alexanderplatz"). Selbst
+angelegte Orte behalten den eingegebenen Namen.
+
+### Kartenhintergrund
+
+Hinter dem Radar liegen Kacheln von OpenStreetMap (`tile.openstreetmap.org`,
+Web-Mercator, an der Standortkoordinate verankert und auf die 1-km-Rasterskala
+gebracht). Das ist ein bewusster Fremd-Request: Beim Laden geht der
+Kartenausschnitt – und damit näherungsweise der Standort – an die OSM-Tile-Server.
+Attribution "© OpenStreetMap" ist eingeblendet (OSM-Tile-Usage-Policy). Der
+Service Worker cacht die Kacheln nicht; offline bleibt der Hintergrund leer, das
+Radar funktioniert weiter. Der metrische Maßstab unten links ist rasterbasiert
+und bleibt exakt (1 Zelle = 1 km), unabhängig vom Kartenhintergrund.
 
 Datenbasis: Deutscher Wetterdienst, via Bright Sky.

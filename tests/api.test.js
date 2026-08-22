@@ -38,6 +38,7 @@ test("Fixture wird korrekt in RadarSeries ueberfuehrt", async () => {
     assert.ok(series.frames[i - 1].validTime.getTime() < series.frames[i].validTime.getTime());
   }
   assert.deepEqual(series.center, CENTER); // aus latlon_position gerundet
+  assert.deepEqual(series.coords, COORDS); // Request-Koordinaten als Marker-Anker
   assert.deepEqual(series.runTime, RUN_TIME); // groesster source-Zeitstempel
   assert.equal(series.frames[0].isForecast, false); // erster Record <= Lauf
   assert.equal(series.frames.at(-1).isForecast, true); // letzter Record > Lauf

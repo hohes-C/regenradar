@@ -222,6 +222,7 @@ export function computeNowcast(series, now, config) {
     freshness,
     coverage,
     center,
+    coords: series.coords ?? null,
     current,
     forecast,
     past,

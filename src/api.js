@@ -19,6 +19,7 @@ const MIN = 60_000;
  *   fetchedAt: Date,
  *   runTime: Date | null,
  *   center: { row: number, col: number },
+ *   coords: { lat: number, lon: number },
  *   frames: Array<{ validTime: Date, grid: (number|null)[][], isForecast: boolean }>
  * }} RadarSeries
  */
@@ -81,7 +82,7 @@ function resolveCenter(pos, rows, cols) {
   return { row: Math.floor(rows / 2), col: Math.floor(cols / 2) };
 }
 
-function normalize(data, now) {
+function normalize(data, now, coords) {
   const records = Array.isArray(data?.radar) ? data.radar : null;
   if (records === null) throw new ApiError("shape", "Feld radar fehlt oder ist kein Array");
   if (records.length === 0) throw new ApiError("empty", "Keine Radar-Records");
@@ -129,7 +130,7 @@ function normalize(data, now) {
     isForecast: runTime ? e.validTime.getTime() > runTime.getTime() : false,
   }));
 
-  return { fetchedAt: now, runTime, center, frames };
+  return { fetchedAt: now, runTime, center, coords, frames };
 }
 
 /**
@@ -173,7 +174,7 @@ export async function fetchRadarSeries({ lat, lon, now, fetchImpl }) {
     throw new ApiError("shape", "Antwort ist kein gueltiges JSON");
   }
 
-  return normalize(data, now);
+  return normalize(data, now, { lat, lon });
 }
 
 /**

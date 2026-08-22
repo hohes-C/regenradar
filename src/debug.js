@@ -39,6 +39,7 @@ function blobSeries(now, opts) {
     fetchedAt: now,
     runTime: new Date(now.getTime() - (opts.runOffsetMin || 0) * MIN),
     center: { row: C, col: C },
+    coords: { lat: 52.52, lon: 13.405 },
     frames,
   };
 }
@@ -50,7 +51,7 @@ function nullSeries(now) {
     const grid = Array.from({ length: GRID }, () => Array(GRID).fill(null));
     frames.push({ validTime, grid, isForecast: validTime.getTime() > now.getTime() });
   }
-  return { fetchedAt: now, runTime: now, center: { row: C, col: C }, frames };
+  return { fetchedAt: now, runTime: now, center: { row: C, col: C }, coords: { lat: 52.52, lon: 13.405 }, frames };
 }
 
 // Regengebiet zieht heran und ueber den Standort (~+40 min), dann weiter.

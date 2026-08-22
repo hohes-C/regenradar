@@ -209,8 +209,8 @@ function wireScrub() {
   });
 }
 
-// Regen-Radar: farbige Niederschlagszellen aus dem DWD-Raster, Standort in der
-// Mitte. Kein Kartenhintergrund (keine Fremd-Requests). Beim Scrubben der
+// Regen-Radar: farbige Niederschlagszellen aus dem DWD-Raster ueber einem
+// OpenStreetMap-Kachelhintergrund, Standort in der Mitte. Beim Scrubben der
 // Zeitleiste zeigt die Karte den jeweiligen Frame, sonst den aktuellen.
 let viewNowcast = null;
 let radarFrame = null;
@@ -343,11 +343,98 @@ function drawScaleBar(ctx, w, h, pxPerKm, col) {
   ctx.restore();
 }
 
+// OpenStreetMap-Kachelhintergrund hinter dem Radar. Web-Mercator, an der
+// Marker-Koordinate verankert und auf die km/px-Skala der Karte gebracht
+// (1 Rasterzelle = 1 km). Kachelnordung ~ Rasternordung; der DWD-Grid ist
+// leicht rotiert, ueber 40 km vernachlaessigbar. Attribution steht im Markup.
+// Der Ausschnitt geht an tile.openstreetmap.org (Fremd-Request, bewusst).
+const TILE = 256;
+const tileUrl = (z, x, y) => `https://tile.openstreetmap.org/${z}/${x}/${y}.png`;
+let mapToken = 0;
+let mapKey = null;
+
+function lonToWorld(lon, z) {
+  return ((lon + 180) / 360) * 2 ** z;
+}
+
+function latToWorld(lat, z) {
+  const r = (lat * Math.PI) / 180;
+  return ((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2) * 2 ** z;
+}
+
+function renderMapBackground(grid) {
+  const canvas = el("radar-bg");
+  if (!canvas || !viewNowcast) return;
+  const ctx = canvas.getContext("2d");
+  const coords = viewNowcast.coords;
+  const center = viewNowcast.center;
+  const rows = Array.isArray(grid) ? grid.length : 0;
+  const cols = rows && Array.isArray(grid[0]) ? grid[0].length : 0;
+  const w = canvas.clientWidth || 0;
+  const h = canvas.clientHeight || 0;
+  if (!coords || !center || !rows || !cols || !w || !h) {
+    mapKey = null;
+    if (w && h) {
+      const dpr0 = window.devicePixelRatio || 1;
+      canvas.width = Math.round(w * dpr0);
+      canvas.height = Math.round(h * dpr0);
+    }
+    return; // ohne Koordinaten (z. B. Debug) kein Hintergrund
+  }
+
+  const dpr = window.devicePixelRatio || 1;
+  const cw = w / cols; // Pixel pro Kilometer (waagerecht)
+  const ch = h / rows;
+  const mCanvasX = (center.col + 0.5) * cw;
+  const mCanvasY = (center.row + 0.5) * ch;
+  const mPerPx = 1000 / cw; // Meter pro Canvas-Pixel
+  const latRad = (coords.lat * Math.PI) / 180;
+  const worldMPerPx = 156543.03392 * Math.cos(latRad); // bei Zoom 0
+  const z = Math.max(3, Math.min(19, Math.round(Math.log2(worldMPerPx / mPerPx))));
+  const tileMPerPx = worldMPerPx / 2 ** z;
+  const s = tileMPerPx / mPerPx; // Canvas-Pixel pro Weltpixel
+
+  const key = `${z}|${coords.lat},${coords.lon}|${center.row},${center.col}|${cols}x${rows}|${w}x${h}@${dpr}`;
+  if (key === mapKey) return; // gleicher Ausschnitt, kein Neuladen
+  mapKey = key;
+
+  canvas.width = Math.round(w * dpr);
+  canvas.height = Math.round(h * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+
+  const wx = lonToWorld(coords.lon, z) * TILE;
+  const wy = latToWorld(coords.lat, z) * TILE;
+  const toCanvas = (px, anchorPx, anchorCanvas) => anchorCanvas + (px - anchorPx) * s;
+  const n = 2 ** z;
+  const txMin = Math.max(0, Math.floor((wx + (0 - mCanvasX) / s) / TILE));
+  const txMax = Math.min(n - 1, Math.floor((wx + (w - mCanvasX) / s) / TILE));
+  const tyMin = Math.max(0, Math.floor((wy + (0 - mCanvasY) / s) / TILE));
+  const tyMax = Math.min(n - 1, Math.floor((wy + (h - mCanvasY) / s) / TILE));
+
+  const token = ++mapToken;
+  const size = TILE * s + 0.5; // leichtes Uebermass gegen Haarlinien
+  for (let tx = txMin; tx <= txMax; tx++) {
+    for (let ty = tyMin; ty <= tyMax; ty++) {
+      const dx = toCanvas(tx * TILE, wx, mCanvasX);
+      const dy = toCanvas(ty * TILE, wy, mCanvasY);
+      const img = new Image();
+      img.onload = () => {
+        if (token !== mapToken) return; // veralteter Ausschnitt
+        ctx.drawImage(img, dx, dy, size, size);
+      };
+      img.onerror = () => {};
+      img.src = tileUrl(z, tx, ty);
+    }
+  }
+}
+
 function renderRadar(frame, isNow) {
   const canvas = el("radar");
   if (!canvas || !frame || !viewNowcast) return;
   radarFrame = { frame, isNow };
   drawRadar(canvas, frame.grid, viewNowcast.center);
+  renderMapBackground(frame.grid);
   const badge = el("radar-time");
   if (badge) badge.textContent = isNow ? "jetzt" : hhmm(frame.validTime);
   ensureRadarObserver(canvas);
@@ -362,7 +449,10 @@ function renderRadarCurrent() {
 function ensureRadarObserver(canvas) {
   if (radarObserver || typeof ResizeObserver === "undefined") return;
   radarObserver = new ResizeObserver(() => {
-    if (radarFrame) drawRadar(canvas, radarFrame.frame.grid, viewNowcast.center);
+    if (radarFrame) {
+      drawRadar(canvas, radarFrame.frame.grid, viewNowcast.center);
+      renderMapBackground(radarFrame.frame.grid);
+    }
   });
   radarObserver.observe(canvas);
 }
