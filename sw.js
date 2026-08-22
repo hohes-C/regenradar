@@ -1,7 +1,7 @@
 // Service Worker. App-Shell cache-first, Bright Sky strikt network-only.
 // Bei jeder Aenderung an der Shell CACHE_VERSION erhoehen.
 
-const CACHE_VERSION = "regenradar-v3";
+const CACHE_VERSION = "regenradar-v4";
 
 const SHELL = [
   "./",
@@ -24,8 +24,13 @@ const SHELL = [
 ];
 
 self.addEventListener("install", (event) => {
+  // Beim Precache frisch vom Server laden (cache:"reload"), sonst kann der
+  // HTTP-Cache eine veraltete Datei in die neue Version schreiben.
   event.waitUntil(
-    caches.open(CACHE_VERSION).then((cache) => cache.addAll(SHELL)).then(() => self.skipWaiting())
+    caches
+      .open(CACHE_VERSION)
+      .then((cache) => Promise.all(SHELL.map((u) => cache.add(new Request(u, { cache: "reload" })))))
+      .then(() => self.skipWaiting())
   );
 });
 
