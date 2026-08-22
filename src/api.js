@@ -175,3 +175,35 @@ export async function fetchRadarSeries({ lat, lon, now, fetchImpl }) {
 
   return normalize(data, now);
 }
+
+/**
+ * Name der naechstgelegenen DWD-Station als Ortslabel. Dekorativ, wirft nie:
+ * bei jedem Fehler kommt null zurueck. Bleibt bei der einen erlaubten API.
+ * @param {{ lat: number, lon: number, fetchImpl?: typeof fetch }} args
+ * @returns {Promise<string|null>}
+ */
+export async function fetchPlaceName({ lat, lon, fetchImpl }) {
+  const doFetch = fetchImpl ?? globalThis.fetch;
+  const url = `${API_BASE}/sources?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const res = await doFetch(url, {
+      signal: controller.signal,
+      headers: { Accept: "application/json" },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const sources = Array.isArray(data?.sources) ? data.sources : [];
+    let nearest = null;
+    for (const s of sources) {
+      const d = typeof s.distance === "number" ? s.distance : Infinity;
+      if (!nearest || d < nearest.distance) nearest = { distance: d, name: s.station_name };
+    }
+    return nearest && typeof nearest.name === "string" ? nearest.name : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}

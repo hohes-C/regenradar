@@ -97,3 +97,13 @@ export function loadLast(id) {
 export function saveLast(id, series) {
   writeJson(lastKey(id), series);
 }
+
+// Aufgeloester Name des automatischen Standorts, gebunden an die gerundeten
+// Koordinaten (key), damit bei Ortswechsel neu aufgeloest wird.
+export function loadGeoName() {
+  return readJson("regenradar.geoName", null);
+}
+
+export function saveGeoName(value) {
+  writeJson("regenradar.geoName", value);
+}

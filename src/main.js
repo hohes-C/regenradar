@@ -1,7 +1,7 @@
 // Bootstrap, Orte, Geolocation und Refresh-Logik. Einziger Ort mit
 // Date.now()/new Date() ohne Argument.
 
-import { fetchRadarSeries, ApiError } from "./api.js";
+import { fetchRadarSeries, fetchPlaceName, ApiError } from "./api.js";
 import { computeNowcast } from "./nowcast.js";
 import { summarize } from "./text.js";
 import {
@@ -21,6 +21,8 @@ import {
   setActiveId,
   loadLast,
   saveLast,
+  loadGeoName,
+  saveGeoName,
 } from "./places.js";
 
 const round = (n) => Number(n.toFixed(COORD_DECIMALS));
@@ -32,14 +34,20 @@ const state = {
   loading: false,
   timer: null,
   render: null, // { summary, nowcast } zuletzt gezeigt
+  geoName: null, // { key, name } aufgeloester Standortname
+  currentState: "loading",
 };
 
 function chips() {
-  return [{ id: "geo", name: "Standort" }, ...state.places];
+  return [{ id: "geo", name: geoLabel() }, ...state.places];
+}
+
+function geoLabel() {
+  return state.geoName?.name ?? "Standort";
 }
 
 function placeName(id) {
-  if (id === "geo") return "Standort";
+  if (id === "geo") return geoLabel();
   return state.places.find((p) => p.id === id)?.name ?? "Ort";
 }
 
@@ -48,6 +56,13 @@ function visualState(nowcast) {
   if (nowcast.freshness === "veryStale") return "veryStale";
   if (nowcast.freshness === "stale") return "stale";
   return "ok";
+}
+
+// Zentrale Render-Schleuse: merkt sich den logischen Zustand, damit ein spaeter
+// aufgeloester Ortsname das Label aktualisieren kann, ohne den Zustand zu verlieren.
+function paint(view) {
+  state.currentState = view.state;
+  render(view);
 }
 
 function baseView(extra) {
@@ -66,7 +81,7 @@ function renderResult(series, now) {
   const nowcast = computeNowcast(series, now, CONFIG);
   const summary = summarize(nowcast);
   state.render = { summary, nowcast };
-  render(baseView({ state: visualState(nowcast), summary, nowcast }));
+  paint(baseView({ state: visualState(nowcast), summary, nowcast }));
 }
 
 function getGeo() {
@@ -81,6 +96,23 @@ function getGeo() {
       { enableHighAccuracy: false, maximumAge: GEO_MAX_AGE_MS, timeout: GEO_TIMEOUT_MS }
     );
   });
+}
+
+// Ortsname des automatischen Standorts nachladen (dekorativ). Aktualisiert das
+// Label, sobald der naechste DWD-Stationsname vorliegt.
+async function resolveGeoName(coords) {
+  const key = `${round(coords.lat)},${round(coords.lon)}`;
+  if (state.geoName?.key === key) return;
+  try {
+    const name = await fetchPlaceName({ lat: round(coords.lat), lon: round(coords.lon) });
+    if (name) {
+      state.geoName = { key, name };
+      saveGeoName(state.geoName);
+      if (state.activeId === "geo") paint(baseView({ state: state.currentState }));
+    }
+  } catch {
+    /* Ortsname ist dekorativ, Fehler ignorieren */
+  }
 }
 
 async function load(force = false) {
@@ -108,7 +140,8 @@ async function load(force = false) {
       coords = { lat: p.lat, lon: p.lon };
     }
 
-    render(baseView({ state: "loading" }));
+    if (id === "geo") resolveGeoName(coords);
+    paint(baseView({ state: "loading" }));
     const now = new Date();
     const series = await fetchRadarSeries({ lat: round(coords.lat), lon: round(coords.lon), now });
     saveLast(id, series);
@@ -116,14 +149,14 @@ async function load(force = false) {
   } catch (err) {
     const offline = typeof navigator !== "undefined" && navigator.onLine === false;
     const kind = err instanceof ApiError ? err.kind : "network";
-    render(baseView({ state: offline ? "offline" : "error", error: { kind } }));
+    paint(baseView({ state: offline ? "offline" : "error", error: { kind } }));
   } finally {
     state.loading = false;
   }
 }
 
 function handleNoGeo() {
-  render(baseView({ state: "noGeo" }));
+  paint(baseView({ state: "noGeo" }));
   const fallback = state.places[0];
   if (fallback) {
     // Nach Zuruecksetzen des loading-Flags auf gespeicherten Ort wechseln.
@@ -141,7 +174,7 @@ function activate(id) {
   if (cached) renderResult(cached, cached.fetchedAt);
   else {
     state.render = null;
-    render(baseView({ state: "loading" }));
+    paint(baseView({ state: "loading" }));
   }
   load(false);
 }
@@ -167,7 +200,7 @@ function onAddSubmit({ name, lat, lon, useGeo }) {
     getGeo()
       .then(finish)
       .catch(() => {
-        render(baseView({ state: "noGeo" }));
+        paint(baseView({ state: "noGeo" }));
       });
   } else {
     finish({ lat, lon });
@@ -188,7 +221,7 @@ function wireEvents() {
       if (state.activeId === target.dataset.del) {
         activate("geo");
       } else {
-        render(baseView({ state: state.render ? visualState(state.render.nowcast) : "loading" }));
+        paint(baseView({ state: state.render ? visualState(state.render.nowcast) : "loading" }));
       }
       return;
     }
@@ -199,7 +232,7 @@ function wireEvents() {
     }
     if (action === "edit") {
       state.editing = !state.editing;
-      render(baseView({ state: state.render ? visualState(state.render.nowcast) : "loading" }));
+      paint(baseView({ state: state.render ? visualState(state.render.nowcast) : "loading" }));
       return;
     }
     if (target.dataset.id && target.dataset.id !== state.activeId) {
@@ -236,6 +269,7 @@ async function boot() {
     return;
   }
 
+  state.geoName = loadGeoName();
   state.places = loadPlaces();
   state.activeId = getActiveId();
   if (state.activeId !== "geo" && !state.places.find((p) => p.id === state.activeId)) {

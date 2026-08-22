@@ -155,4 +155,9 @@ API-Key, CORS offen. Fair Use: höchstens eine Anfrage pro Ort und 5 Minuten;
 keine Anfragen, solange die App nicht sichtbar ist (beides in `main.js`
 umgesetzt).
 
+Der Ortsname des automatischen Standorts kommt aus dem Bright-Sky-Endpoint
+`/sources` (nächstgelegene DWD-Station, z. B. "Berlin-Alexanderplatz"). Das bleibt
+bei der einen erlaubten API; es geht keine Position an Dritte. Selbst angelegte
+Orte behalten den eingegebenen Namen.
+
 Datenbasis: Deutscher Wetterdienst, via Bright Sky.
