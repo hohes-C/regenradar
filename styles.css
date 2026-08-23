@@ -426,16 +426,20 @@ body[data-refreshing] .refresh-glyph {
 }
 
 /* Radar-Karte. Nimmt den Platz, der nach den anderen Karten uebrig bleibt. */
+/* Die Radar-Karte waechst auf hohen Fenstern in den freien Platz, schrumpft
+   aber nie unter ein etwa quadratisches Format. Auf niedrigen Fenstern wird
+   dafuer gescrollt: eine lesbare Karte ist wichtiger als eine Seite ohne Scroll. */
 .card-radar {
-  flex: 1;
-  min-height: clamp(112px, 21vh, 165px);
+  flex: 1 0 auto;
   display: flex;
   flex-direction: column;
 }
+.card-radar .radar-canvas-wrap {
+  flex: 1;
+  min-height: min(78vw, 380px);
+}
 .radar-canvas-wrap {
   position: relative;
-  flex: 1;
-  min-height: 0;
   width: 100%;
   background: var(--sunken);
   border-radius: var(--radius-sm);
