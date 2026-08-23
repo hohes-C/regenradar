@@ -1,51 +1,34 @@
+/* Ein Farbschema, dunkles Violett mit Verlauf. Keine Light-Mode-Variante: die
+   App ist bewusst immer dunkel, damit die Radarfarben ueberall gleich wirken. */
 :root {
-  color-scheme: light dark;
+  color-scheme: dark;
 
-  --bg: #f2f4f8;
-  --surface: #ffffff;
-  --text: #0b1020;
-  --muted: #5b6472;
-  --line: #d7dce6;
+  --text: #ffffff;
+  --muted: rgba(255, 255, 255, 0.66);
+  --faint: rgba(255, 255, 255, 0.42);
 
-  /* Kategorie-Farben, helles Blau -> Magenta */
-  --cat-none: #cbd5e1;
-  --cat-light: #93c5fd;
-  --cat-moderate: #3b82f6;
-  --cat-strong: #5b21b6;
-  --cat-extreme: #db2777;
+  --card: rgba(255, 255, 255, 0.13);
+  --card-line: rgba(255, 255, 255, 0.11);
+  --sunken: rgba(30, 12, 50, 0.28);
+  --map-halo: #2a1f47; /* Halo hinter Maszstab und Beschriftung auf der Karte */
 
-  /* Ampel fuer die Kacheln */
-  --dot-dry: #16a34a;
-  --dot-warn: #f59e0b;
-  --dot-alert: #dc2626;
+  /* Intensitaet des Niederschlags, aufsteigend. Auf Violett abgestimmt. */
+  --cat-none: rgba(255, 255, 255, 0.22);
+  --cat-light: #7fe1ff;
+  --cat-moderate: #38d6a0;
+  --cat-strong: #ffd166;
+  --cat-extreme: #ff5d8f;
 
-  --warn-bg: #fdecc4;
-  --warn-fg: #7a5900;
-  --alert-bg: #fbd5d5;
-  --alert-fg: #8a1c1c;
+  /* DWD-Warnstufen. 0 ist die Entwarnung, 1 bis 4 das amtliche Schema. */
+  --lvl-0: #35c46a;
+  --lvl-1: #ffd43b;
+  --lvl-2: #ff9f1c;
+  --lvl-3: #ee4d3d;
+  --lvl-4: #c026a8;
 
-  --radius: 14px;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0b1020;
-    --surface: #151b2e;
-    --text: #e7ecf5;
-    --muted: #9aa4b8;
-    --line: #2a3350;
-
-    --cat-none: #3a4256;
-    --cat-light: #3b82f6;
-    --cat-moderate: #2563eb;
-    --cat-strong: #7c3aed;
-    --cat-extreme: #ec4899;
-
-    --warn-bg: #3a3210;
-    --warn-fg: #f4d67a;
-    --alert-bg: #3a1414;
-    --alert-fg: #f6a3a3;
-  }
+  --radius: 18px;
+  --radius-sm: 12px;
+  --tabbar-h: 58px;
 }
 
 * {
@@ -58,7 +41,6 @@ body {
   padding: 0;
 }
 
-/* Eine Seite, kein Scrollen: die App fuellt genau den sichtbaren Bereich. */
 html {
   height: 100%;
 }
@@ -68,64 +50,92 @@ body {
   height: 100dvh;
   overflow: hidden;
   overscroll-behavior: none;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: ui-rounded, "SF Pro Rounded", "Hiragino Maru Gothic ProN", Avenir,
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   font-size: 17px;
-  line-height: 1.4;
+  line-height: 1.35;
   color: var(--text);
-  background: var(--bg);
+  background: #2a2140;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Der Verlauf liegt fix hinter der App, damit er beim Scrollen steht. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(180deg, #241d3c 0%, #3a2a5e 24%, #7a3fba 66%, #ab48dd 100%);
+}
+
+.sprite {
+  position: absolute;
+  width: 0;
+  height: 0;
 }
 
 .app {
   max-width: 560px;
   height: 100%;
   margin: 0 auto;
-  padding: max(10px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right))
-    max(10px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
   display: flex;
   flex-direction: column;
-  gap: clamp(6px, 1.2vh, 12px);
   overflow: hidden;
 }
 
-/* Ortszeile */
-.place-bar {
+/* Nur der Reiter, der zum body-Zustand passt, ist sichtbar. */
+.view {
+  flex: 1;
+  min-height: 0;
+  display: none;
+  flex-direction: column;
+  padding: max(8px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) 0
+    max(14px, env(safe-area-inset-left));
+}
+body[data-tab="rain"] .view-rain,
+body[data-tab="alerts"] .view-alerts {
+  display: flex;
+}
+
+/* Kopfzeile mit runden Symbolknoepfen */
+.topbar {
+  flex: none;
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 12px;
+  min-height: 40px;
 }
-.place-name {
-  font-size: 18px;
-  font-weight: 600;
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.view-title {
+  font-size: 26px;
+  font-weight: 800;
+  margin: 0;
+  letter-spacing: -0.01em;
 }
-.refresh {
+.icon-btn {
   flex: none;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  border: 1px solid var(--line);
-  background: var(--surface);
+  width: 40px;
+  height: 40px;
+  border-radius: 13px;
+  border: none;
+  background: var(--card);
   color: var(--text);
   cursor: pointer;
   display: grid;
   place-items: center;
+  -webkit-tap-highlight-color: transparent;
 }
-.refresh:active {
-  transform: scale(0.94);
+.icon-btn:active {
+  transform: scale(0.93);
 }
-.refresh-glyph {
-  width: 20px;
-  height: 20px;
-  border: 2.5px solid currentColor;
-  border-top-color: transparent;
-  border-radius: 50%;
+.icon-btn svg {
+  width: 21px;
+  height: 21px;
 }
-body[data-state="loading"] .refresh-glyph,
+.icon-btn[aria-pressed="true"] {
+  background: rgba(255, 255, 255, 0.3);
+}
+body[data-state="loading"] .view-rain .refresh-glyph,
 body[data-refreshing] .refresh-glyph {
   animation: spin 0.9s linear infinite;
 }
@@ -135,107 +145,179 @@ body[data-refreshing] .refresh-glyph {
   }
 }
 
-.status-row {
+/* Hero: Symbol, Kurzfassung, Ort */
+.hero {
+  flex: none;
   display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 4px 10px;
-  margin: -4px 0 0;
-  min-height: 1.2em;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: clamp(4px, 1.2vh, 12px);
+  padding: clamp(4px, 1.6vh, 16px) 0 clamp(8px, 1.6vh, 16px);
 }
-.status {
-  font-size: 14px;
+.hero-icon {
+  width: clamp(56px, 11vh, 92px);
+  height: clamp(56px, 11vh, 92px);
+  border-radius: 50%;
+  background: rgba(24, 18, 40, 0.55);
+  display: grid;
+  place-items: center;
+}
+.hero-icon svg {
+  width: 62%;
+  height: 62%;
+}
+.title-box {
+  display: grid;
+  place-items: center;
+  min-height: 2.24em; /* zwei Zeilen reserviert, kein Layout-Sprung */
+  font-size: clamp(26px, 8vw, 40px);
+  width: 100%;
+}
+.title {
+  font-size: inherit;
+  line-height: 1.12;
+  font-weight: 800;
+  letter-spacing: -0.015em;
+  margin: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.place-line {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 16px;
   color: var(--muted);
+  min-width: 0;
 }
-.checked {
-  font-size: 13px;
-  color: var(--muted);
-  opacity: 0.75;
+.place-line-left {
+  justify-content: flex-start;
+  margin-top: 2px;
 }
-body[data-state="stale"] .status {
-  color: var(--warn-fg);
-  background: var(--warn-bg);
-  padding: 4px 10px;
-  border-radius: 8px;
-  align-self: flex-start;
+.place-line span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-body[data-state="veryStale"] .status {
-  color: var(--alert-fg);
-  background: var(--alert-bg);
-  padding: 4px 10px;
-  border-radius: 8px;
-  align-self: flex-start;
+.place-arrow {
+  flex: none;
+  width: 17px;
+  height: 17px;
+  color: var(--text);
 }
 
-.content {
+/* Fehler- und Offline-Hinweis */
+.banner {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: rgba(238, 77, 61, 0.9);
+  color: #fff;
+}
+.banner-text {
+  flex: 1;
+  font-size: 14px;
+}
+.retry {
+  flex: none;
+  min-height: 34px;
+  padding: 0 14px;
+  border-radius: 9px;
+  border: none;
+  background: rgba(255, 255, 255, 0.92);
+  color: #8a1c1c;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* Der scrollbare Bereich. Auf ueblichen Telefonen passt alles hinein, auf sehr
+   niedrigen Fenstern wird gescrollt statt abgeschnitten. */
+.scroll {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: clamp(8px, 1.6vh, 16px);
+  gap: 10px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 10px;
+  scrollbar-width: none;
+}
+.scroll::-webkit-scrollbar {
+  display: none;
 }
 
-.headline {
-  font-size: clamp(19px, 5.4vw, 25px);
-  line-height: 1.22;
+/* Karten */
+.card {
+  flex: none;
+  background: var(--card);
+  border: 1px solid var(--card-line);
+  border-radius: var(--radius);
+  padding: 10px 12px 12px;
+}
+.card-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 8px;
+  font-size: 11px;
   font-weight: 700;
-  margin: 0;
-  min-height: 2.44em; /* zwei Zeilen reserviert, kein Layout-Sprung */
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.card-head svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+.card-note {
+  margin-left: auto;
+  min-width: 0;
   overflow: hidden;
+  text-overflow: ellipsis;
+  display: flex;
+  gap: 8px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: none;
+  color: var(--faint);
+  white-space: nowrap;
 }
 .detail {
-  margin: -4px 0 0;
-  font-size: 15px;
+  margin: 0 0 8px;
+  font-size: 14px;
   color: var(--muted);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 .detail:empty {
   display: none;
 }
 
-/* Fehler- und Offline-Banner */
-.banner {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
-  border-radius: var(--radius);
-  background: var(--alert-bg);
-  color: var(--alert-fg);
-}
-.banner-text {
-  flex: 1;
-  font-size: 15px;
-}
-.retry {
-  flex: none;
-  min-height: 44px;
-  padding: 0 16px;
-  border-radius: 10px;
-  border: none;
-  background: var(--alert-fg);
-  color: var(--surface);
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
 /* Zeitleiste */
 .timeline-wrap {
-  flex: none;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 10px 12px 6px;
   position: relative;
 }
 .timeline {
   display: flex;
   align-items: flex-end;
   gap: 2px;
-  height: clamp(52px, 10vh, 96px);
+  height: clamp(48px, 8.4vh, 84px);
   touch-action: none;
 }
 .scrub-line {
@@ -248,19 +330,18 @@ body[data-state="veryStale"] .status {
   z-index: 1;
 }
 .scrub-line.on {
-  opacity: 0.4;
+  opacity: 0.45;
 }
 .scrub-readout {
   position: absolute;
-  top: 2px;
+  top: -6px;
   transform: translateX(-50%);
-  background: var(--surface);
-  border: 1px solid var(--line);
+  background: #2b2145;
   color: var(--text);
   border-radius: 8px;
-  padding: 2px 8px;
+  padding: 3px 9px;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
   white-space: nowrap;
   pointer-events: none;
   opacity: 0;
@@ -284,21 +365,21 @@ body[data-state="veryStale"] .status {
   flex: none;
   width: 2px;
   align-self: stretch;
-  background: var(--line);
+  background: rgba(255, 255, 255, 0.22);
   margin: 0 4px;
 }
 .bar {
   flex: 1;
   min-width: 3px;
   height: 6%;
-  border-radius: 3px 3px 2px 2px;
+  border-radius: 3px;
   background: var(--cat-none);
 }
 .bar.past {
-  opacity: 0.45;
+  opacity: 0.4;
 }
 .bar.uncertain {
-  opacity: 0.6;
+  opacity: 0.62;
 }
 .bar.cat-none {
   background: var(--cat-none);
@@ -318,8 +399,8 @@ body[data-state="veryStale"] .status {
 .bar.nodata {
   background: repeating-linear-gradient(
     45deg,
-    var(--line),
-    var(--line) 3px,
+    rgba(255, 255, 255, 0.2),
+    rgba(255, 255, 255, 0.2) 3px,
     transparent 3px,
     transparent 6px
   );
@@ -328,9 +409,9 @@ body[data-state="veryStale"] .status {
 .ticks {
   position: relative;
   height: 1.3em;
-  margin-top: 4px;
+  margin-top: 5px;
   font-size: 12px;
-  color: var(--muted);
+  color: var(--faint);
 }
 .tick {
   position: absolute;
@@ -340,28 +421,28 @@ body[data-state="veryStale"] .status {
 .tick.now {
   left: 0;
   transform: none;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text);
 }
 
-/* Regen-Radar */
-.radar {
-  flex: 1;
-  min-height: 84px;
+/* Radar-Karte. Nimmt den Platz, der nach den anderen Karten uebrig bleibt. */
+/* Die Radar-Karte waechst auf hohen Fenstern in den freien Platz, schrumpft
+   aber nie unter ein etwa quadratisches Format. Auf niedrigen Fenstern wird
+   dafuer gescrollt: eine lesbare Karte ist wichtiger als eine Seite ohne Scroll. */
+.card-radar {
+  flex: 1 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 6px;
 }
-/* Die Karte nimmt den verbleibenden Platz. Das Raster fuellt sie formatfuellend
-   (siehe gridGeom in ui.js), daher ist jedes Seitenverhaeltnis in Ordnung. */
+.card-radar .radar-canvas-wrap {
+  flex: 1;
+  min-height: min(78vw, 380px);
+}
 .radar-canvas-wrap {
   position: relative;
-  flex: 1;
-  min-height: 0;
   width: 100%;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
+  background: var(--sunken);
+  border-radius: var(--radius-sm);
   overflow: hidden;
 }
 .radar-bg,
@@ -374,11 +455,10 @@ body[data-state="veryStale"] .status {
 }
 .radar-bg {
   z-index: 0;
-  /* Entsaettigt und via Deckkraft in die Flaechenfarbe eingetoent, damit die
-     bunten OSM-Kacheln als ruhiger Backdrop hinter den Niederschlagsfarben
-     zuruecktreten. Der Wrap-Hintergrund (--surface) scheint durch. */
-  opacity: 0.5;
-  filter: grayscale(1) contrast(0.9) brightness(1.06);
+  /* Entsaettigt, invertiert und abgedunkelt, damit die bunten OSM-Kacheln als
+     ruhiger Backdrop hinter den Niederschlagsfarben zuruecktreten. */
+  opacity: 0.42;
+  filter: invert(1) hue-rotate(180deg) grayscale(0.95) brightness(0.85) contrast(0.8);
 }
 .radar-canvas {
   z-index: 1;
@@ -386,14 +466,13 @@ body[data-state="veryStale"] .status {
 .radar-time {
   z-index: 2;
   position: absolute;
-  top: 8px;
-  left: 8px;
-  padding: 2px 8px;
+  top: 7px;
+  left: 7px;
+  padding: 2px 9px;
   border-radius: 8px;
-  background: color-mix(in srgb, var(--surface) 75%, transparent);
-  border: 1px solid var(--line);
-  font-size: 13px;
-  font-weight: 600;
+  background: rgba(24, 18, 40, 0.62);
+  font-size: 12px;
+  font-weight: 700;
   color: var(--text);
 }
 .radar-attrib {
@@ -403,19 +482,11 @@ body[data-state="veryStale"] .status {
   z-index: 2;
   padding: 1px 6px;
   border-radius: 6px;
-  background: color-mix(in srgb, var(--surface) 70%, transparent);
-  color: var(--muted);
+  background: rgba(24, 18, 40, 0.5);
+  color: var(--faint);
   font-size: 10px;
   line-height: 1.4;
   text-decoration: none;
-}
-@media (prefers-color-scheme: dark) {
-  /* Im Dark Mode zusaetzlich invertiert, sodass die helle Karte dunkel wird
-     und sich in die dunkle Flaeche einfuegt. */
-  .radar-bg {
-    opacity: 0.5;
-    filter: invert(1) hue-rotate(180deg) grayscale(0.95) brightness(0.9) contrast(0.85);
-  }
 }
 .radar-legend {
   flex: none;
@@ -423,8 +494,8 @@ body[data-state="veryStale"] .status {
   flex-wrap: nowrap;
   justify-content: space-between;
   gap: 8px;
+  margin-top: 8px;
   font-size: 11px;
-  line-height: 1.2;
   color: var(--muted);
 }
 .legend-item {
@@ -433,8 +504,8 @@ body[data-state="veryStale"] .status {
   gap: 6px;
 }
 .legend-swatch {
-  width: 12px;
-  height: 12px;
+  width: 11px;
+  height: 11px;
   border-radius: 3px;
   background: var(--cat-none);
 }
@@ -451,46 +522,134 @@ body[data-state="veryStale"] .status {
   background: var(--cat-extreme);
 }
 
-/* Orte-Chips */
-.places {
-  flex: none;
+/* Warnungen: Karte je Ereignisart, Zeile je Warnung. */
+.alert-row {
   display: flex;
-  flex-wrap: nowrap;
-  gap: 8px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-  padding-bottom: 2px;
+  align-items: flex-start;
+  gap: 11px;
+  width: 100%;
+  padding: 6px 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
-.places::-webkit-scrollbar {
+.alert-row + .alert-row {
+  border-top: 1px solid var(--card-line);
+}
+.lvl {
+  flex: none;
+  width: 27px;
+  height: 27px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+  font-weight: 800;
+  color: #24123a;
+  background: var(--lvl-1);
+}
+.lvl-0 {
+  background: var(--lvl-0);
+}
+.lvl-1 {
+  background: var(--lvl-1);
+}
+.lvl-2 {
+  background: var(--lvl-2);
+}
+.lvl-3 {
+  background: var(--lvl-3);
+  color: #fff;
+}
+.lvl-4 {
+  background: var(--lvl-4);
+  color: #fff;
+}
+.alert-body {
+  flex: 1;
+  min-width: 0;
+}
+.alert-line {
+  font-size: 16px;
+  line-height: 1.3;
+}
+.alert-when {
+  display: block;
+  margin-top: 1px;
+  font-size: 12.5px;
+  color: var(--faint);
+}
+.alert-more {
+  margin: 4px 0 2px;
+  font-size: 14px;
+  color: var(--muted);
+}
+.alert-more p {
+  margin: 0 0 6px;
+}
+.alert-row[aria-expanded="false"] .alert-more {
   display: none;
+}
+.alert-empty {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  font-size: 16px;
+}
+.alerts-foot {
+  flex: none;
+  margin: 2px 0 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--faint);
+}
+
+/* Orte: Blatt ueber der Seite, ueber den Knopf oben links */
+.places {
+  position: fixed;
+  z-index: 20;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+  max-width: 560px;
+  margin: 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 14px;
+  background: #33265a;
+  border-top: 1px solid var(--card-line);
+  box-shadow: 0 -14px 34px rgba(0, 0, 0, 0.34);
 }
 .chip {
   flex: none;
-  max-width: 60vw;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-height: 44px;
-  padding: 0 16px;
-  border-radius: 22px;
-  border: 1px solid var(--line);
-  background: var(--surface);
+  max-width: 62vw;
+  min-height: 40px;
+  padding: 0 15px;
+  border-radius: 20px;
+  border: 1px solid var(--card-line);
+  background: rgba(255, 255, 255, 0.13);
   color: var(--text);
+  font: inherit;
   font-size: 15px;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  overflow: hidden;
+  white-space: nowrap;
 }
 .chip[aria-current="true"] {
-  background: var(--cat-moderate);
-  border-color: var(--cat-moderate);
-  color: #fff;
+  background: #fff;
+  border-color: #fff;
+  color: #3a1f63;
+  font-weight: 700;
 }
 .chip.add {
-  font-weight: 700;
+  font-weight: 800;
 }
 .chip.edit-on {
   border-style: dashed;
@@ -505,18 +664,64 @@ body[data-state="veryStale"] .status {
   padding: 0 2px;
 }
 
-.footer {
+/* Reiterleiste */
+.tabbar {
   flex: none;
-  font-size: 10px;
-  color: var(--muted);
-  opacity: 0.8;
+  display: flex;
+  height: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
+  background: rgba(24, 18, 40, 0.55);
+  border-top: 1px solid var(--card-line);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+.tab {
+  position: relative;
+  flex: 1;
+  border: none;
+  background: none;
+  color: var(--faint);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  -webkit-tap-highlight-color: transparent;
+}
+.tab svg {
+  width: 22px;
+  height: 22px;
+}
+.tab[aria-current="true"] {
+  color: var(--text);
+}
+.tab-badge {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  margin-left: 6px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: var(--lvl-3);
+  color: #fff;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 800;
+  line-height: 17px;
   text-align: center;
 }
 
-/* Formular zum Ort hinzufuegen */
+/* Formular zum Ort hinzufuegen, ebenfalls als Blatt */
 .place-form {
   position: fixed;
-  z-index: 20;
+  z-index: 21;
   left: 0;
   right: 0;
   bottom: 0;
@@ -527,19 +732,22 @@ body[data-state="veryStale"] .status {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  background: var(--surface);
-  border: 1px solid var(--line);
+  background: #33265a;
   border-radius: var(--radius) var(--radius) 0 0;
-  box-shadow: 0 -12px 32px rgba(0, 0, 0, 0.28);
+  box-shadow: 0 -14px 34px rgba(0, 0, 0, 0.4);
   padding: 14px 14px calc(14px + env(safe-area-inset-bottom));
 }
 .place-form input {
+  font: inherit;
   font-size: 16px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  border: 1px solid var(--line);
-  background: var(--bg);
+  padding: 11px 13px;
+  border-radius: 11px;
+  border: 1px solid var(--card-line);
+  background: rgba(0, 0, 0, 0.22);
   color: var(--text);
+}
+.place-form input::placeholder {
+  color: var(--faint);
 }
 .place-form .row {
   display: flex;
@@ -553,24 +761,26 @@ body[data-state="veryStale"] .status {
 .place-form button {
   min-height: 44px;
   padding: 0 14px;
-  border-radius: 10px;
-  border: 1px solid var(--line);
-  background: var(--surface);
+  border-radius: 11px;
+  border: 1px solid var(--card-line);
+  background: rgba(255, 255, 255, 0.13);
   color: var(--text);
+  font: inherit;
   font-size: 15px;
   cursor: pointer;
 }
 .place-form button.primary {
-  background: var(--cat-moderate);
-  border-color: var(--cat-moderate);
-  color: #fff;
-  font-weight: 600;
+  background: #fff;
+  border-color: #fff;
+  color: #3a1f63;
+  font-weight: 700;
 }
 
-body[data-state="loading"] .headline,
-body[data-state="loading"] .timeline-wrap,
-body[data-state="loading"] .radar {
-  opacity: 0.5;
+/* Nur die Regenansicht abblenden: der Warnungen-Reiter laedt eigenstaendig. */
+body[data-state="loading"] .hero-icon,
+body[data-state="loading"] .title,
+body[data-state="loading"] .view-rain .scroll {
+  opacity: 0.55;
 }
 
 [hidden] {

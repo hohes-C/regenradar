@@ -13,7 +13,8 @@ import {
   GEO_MAX_AGE_MS,
   GEO_TIMEOUT_MS,
 } from "./config.js";
-import { render, openPlaceForm, closePlaceForm } from "./ui.js";
+import { render, renderAlerts, setTab, setAlertBadge, openPlaceForm, closePlaceForm } from "./ui.js";
+import { fetchAlerts } from "./alerts.js";
 import {
   loadPlaces,
   addPlace,
@@ -36,6 +37,11 @@ const state = {
   timer: null, // Netz-Poll
   clock: null, // Neuberechnung gegen die Uhr
   series: null, // zuletzt geladene RadarSeries des aktiven Ortes
+  tab: "rain", // sichtbarer Reiter: rain | alerts
+  placesOpen: false,
+  alerts: null, // zuletzt geladene Warnungen des aktiven Ortes
+  alertsLoading: false,
+  alertsState: "loading",
   render: null, // { summary, nowcast } zuletzt gezeigt
   geoName: null, // { key, name } aufgeloester Standortname
   currentState: "loading",
@@ -95,6 +101,7 @@ function baseView(extra) {
     nowcast: state.render?.nowcast ?? null,
     coords: activeCoords(),
     fetchedAt: state.series?.fetchedAt ?? null,
+    placesOpen: state.placesOpen,
     ...extra,
   };
 }
@@ -105,6 +112,49 @@ function renderResult(series, now) {
   const summary = summarize(nowcast);
   state.render = { summary, nowcast };
   paint(baseView({ state: visualState(nowcast), summary, nowcast }));
+}
+
+function paintAlerts(extra = {}) {
+  renderAlerts({
+    state: state.alertsState,
+    place: { name: placeName(state.activeId) },
+    alerts: state.alerts,
+    ...extra,
+  });
+  setAlertBadge(state.alerts?.count ?? 0);
+}
+
+// Amtliche DWD-Warnungen des aktiven Ortes. Eigener Abruf, unabhaengig vom
+// Radar: ein Fehler hier darf die Regenansicht nicht stoeren und umgekehrt.
+async function loadAlerts(force = false) {
+  if (state.alertsLoading) return;
+  const id = state.activeId;
+  const fresh = state.alerts && Date.now() - state.alerts.fetchedAt.getTime() < MIN_REFETCH_MS;
+  if (!force && fresh) return;
+
+  const coords = activeCoords();
+  if (!coords) return; // ohne Ort kein Abruf, kommt mit dem naechsten Radar-Lauf
+
+  state.alertsLoading = true;
+  if (!state.alerts) {
+    state.alertsState = "loading";
+    paintAlerts();
+  }
+  try {
+    const data = await fetchAlerts({ lat: round(coords.lat), lon: round(coords.lon), now: new Date() });
+    if (state.activeId !== id) return; // Ort wurde zwischenzeitlich gewechselt
+    state.alerts = data;
+    state.alertsState = "ok";
+    paintAlerts();
+  } catch (err) {
+    if (state.activeId !== id) return;
+    const offline = typeof navigator !== "undefined" && navigator.onLine === false;
+    const kind = err instanceof ApiError ? err.kind : "network";
+    state.alertsState = offline ? "offline" : "error";
+    paintAlerts({ error: { kind } });
+  } finally {
+    state.alertsLoading = false;
+  }
 }
 
 // Anzeige gegen die aktuelle Uhr neu rechnen, ohne Netz. Ohne das haengen
@@ -184,6 +234,7 @@ async function load(force = false) {
     const series = await fetchRadarSeries({ lat: round(coords.lat), lon: round(coords.lon), now });
     saveLast(id, series);
     renderResult(series, now);
+    loadAlerts(force);
   } catch (err) {
     const offline = typeof navigator !== "undefined" && navigator.onLine === false;
     const kind = err instanceof ApiError ? err.kind : "network";
@@ -206,6 +257,10 @@ function activate(id) {
   state.activeId = id;
   setActiveId(id);
   state.editing = false;
+  state.placesOpen = false;
+  state.alerts = null;
+  state.alertsState = "loading";
+  paintAlerts();
   closePlaceForm();
 
   const cached = loadLast(id);
@@ -218,8 +273,23 @@ function activate(id) {
   load(false);
 }
 
+function switchTab(tab) {
+  if (!tab || tab === state.tab) return;
+  state.tab = tab;
+  state.placesOpen = false;
+  closePlaceForm();
+  setTab(tab);
+  paint(baseView({ state: state.currentState }));
+  if (tab === "alerts") loadAlerts(false);
+}
+
 function startPolling() {
-  if (!state.timer) state.timer = setInterval(() => load(false), REFRESH_MS);
+  if (!state.timer) {
+    state.timer = setInterval(() => {
+      load(false);
+      loadAlerts(false);
+    }, REFRESH_MS);
+  }
   if (!state.clock) state.clock = setInterval(retick, CLOCK_MS);
 }
 
@@ -255,7 +325,7 @@ async function refreshAll() {
   if (state.loading) return;
   document.body.dataset.refreshing = "1";
   try {
-    await load(true);
+    await Promise.all([load(true), loadAlerts(true)]);
   } finally {
     delete document.body.dataset.refreshing;
   }
@@ -263,8 +333,22 @@ async function refreshAll() {
 
 function wireEvents() {
   document.getElementById("refresh").addEventListener("click", refreshAll);
+  document.getElementById("alerts-refresh").addEventListener("click", refreshAll);
   document.getElementById("retry").addEventListener("click", refreshAll);
-  window.addEventListener("online", () => load(false));
+  window.addEventListener("online", () => {
+    load(false);
+    loadAlerts(false);
+  });
+
+  for (const btn of document.querySelectorAll(".tab")) {
+    btn.addEventListener("click", () => switchTab(btn.dataset.tab));
+  }
+
+  document.getElementById("places-btn").addEventListener("click", () => {
+    state.placesOpen = !state.placesOpen;
+    if (!state.placesOpen) closePlaceForm();
+    paint(baseView({ state: state.currentState }));
+  });
 
   document.getElementById("places").addEventListener("click", (e) => {
     const target = e.target.closest("[data-id], [data-action], [data-del]");
@@ -289,8 +373,13 @@ function wireEvents() {
       paint(baseView({ state: state.render ? visualState(state.render.nowcast) : "loading" }));
       return;
     }
-    if (target.dataset.id && target.dataset.id !== state.activeId) {
-      activate(target.dataset.id);
+    if (target.dataset.id) {
+      if (target.dataset.id === state.activeId) {
+        state.placesOpen = false;
+        paint(baseView({ state: state.currentState }));
+      } else {
+        activate(target.dataset.id);
+      }
     }
   });
 
@@ -299,6 +388,7 @@ function wireEvents() {
       startPolling();
       retick(); // sofort auf die aktuelle Uhrzeit, auch ohne neue Daten
       load(false);
+      loadAlerts(false);
     } else {
       stopPolling();
     }
@@ -332,6 +422,7 @@ async function boot() {
   }
 
   wireEvents();
+  setTab(state.tab);
   activate(state.activeId);
   if (document.visibilityState === "visible") startPolling();
 }

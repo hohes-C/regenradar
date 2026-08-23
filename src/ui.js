@@ -2,6 +2,7 @@
 // fertiges View-Objekt und schreibt es in das Skelett aus index.html.
 
 import { fmtRate, hhmm, categoryLabel } from "./text.js";
+import { levelLabel } from "./alerts.js";
 import { HORIZON_MIN, FRAME_MIN, PAST_MIN, MMH_PER_UNIT, CONFIG } from "./config.js";
 import { categorize } from "./nowcast.js";
 
@@ -226,7 +227,7 @@ function cssColors() {
     strong: get("--cat-strong"),
     extreme: get("--cat-extreme"),
     text: get("--text"),
-    surface: get("--surface"),
+    surface: get("--map-halo"),
   };
 }
 
@@ -540,7 +541,6 @@ function renderPlaces(places, activeId, editing) {
 // oder {name, useGeo:true}. Reines DOM, Logik liegt in main.js.
 export function openPlaceForm({ onSubmit, onCancel }) {
   closePlaceForm();
-  const nav = el("places");
   const form = document.createElement("form");
   form.className = "place-form";
   form.id = "place-form";
@@ -571,7 +571,7 @@ export function openPlaceForm({ onSubmit, onCancel }) {
     onSubmit({ name, useGeo: true });
   });
   form.querySelector('[data-act="cancel"]').addEventListener("click", () => onCancel?.());
-  nav.insertAdjacentElement("afterend", form);
+  document.body.append(form);
   form.name.focus();
 }
 
@@ -579,16 +579,44 @@ export function closePlaceForm() {
   document.getElementById("place-form")?.remove();
 }
 
+// Wettersymbol im Hero. Drei Zustaende, gezeichnet statt als Schriftzeichen,
+// damit es auf jedem Geraet gleich aussieht.
+const HERO_SVG = {
+  dry: `<svg viewBox="0 0 64 64" aria-hidden="true">
+    <circle cx="32" cy="30" r="13" fill="#ffd166" />
+    <g stroke="#ffd166" stroke-width="3.4" stroke-linecap="round">
+      <path d="M32 7v6M32 47v6M9 30h6M49 30h6M15.8 13.8l4.2 4.2M44 42l4.2 4.2M48.2 13.8 44 18M20 42l-4.2 4.2" />
+    </g></svg>`,
+  soon: `<svg viewBox="0 0 64 64" aria-hidden="true">
+    <path d="M18 42a10 10 0 0 1 .8-19.9 14 14 0 0 1 26.3 3.1A8.9 8.9 0 0 1 44 42H18Z" fill="#ffffff" />
+    <g stroke="#7fe1ff" stroke-width="3.6" stroke-linecap="round">
+      <path d="M25 48l-2.4 6M39 48l-2.4 6" />
+    </g></svg>`,
+  rain: `<svg viewBox="0 0 64 64" aria-hidden="true">
+    <path d="M18 40a10 10 0 0 1 .8-19.9 14 14 0 0 1 26.3 3.1A8.9 8.9 0 0 1 44 40H18Z" fill="#ffffff" />
+    <g stroke="#7fe1ff" stroke-width="3.6" stroke-linecap="round">
+      <path d="M22 46l-3 8M31 46l-3 8M40 46l-3 8M49 46l-3 8" />
+    </g></svg>`,
+};
+
+function renderHeroIcon(kind) {
+  const box = el("hero-icon");
+  if (!box || box.dataset.kind === kind) return;
+  box.dataset.kind = kind;
+  box.innerHTML = HERO_SVG[kind] ?? HERO_SVG.dry;
+}
+
 /**
  * @param {{
  *   state: string,
  *   place?: {name: string},
- *   summary?: {headline: string, detail: string|null, status: string}|null,
+ *   summary?: {title: string, icon: string, headline: string, detail: string|null, status: string}|null,
  *   nowcast?: object|null,
  *   error?: {kind: string, message?: string}|null,
  *   places?: {id: string, name: string}[],
  *   activePlaceId?: string,
  *   editing?: boolean,
+ *   placesOpen?: boolean,
  *   fetchedAt?: Date|null,
  * }} view
  */
@@ -598,12 +626,15 @@ export function render(view) {
   el("place-name").textContent = view.place?.name ?? "Aktueller Standort";
 
   const summary = view.summary;
-  el("status").textContent = summary?.status ?? (view.state === "loading" ? "Wird geladen" : "");
+  el("title").textContent = summary?.title ?? (view.state === "loading" ? "Wird geladen" : "");
+  renderHeroIcon(summary?.icon ?? "dry");
+  // Der ausfuehrliche Satz steht als Erlaeuterung in der Vorhersage-Karte.
+  const detail = [summary?.headline, summary?.detail].filter(Boolean).join(" ");
+  el("detail").textContent = detail;
+  el("status").textContent = summary?.status ?? "";
   // Zeitpunkt des letzten erfolgreichen Abrufs. Macht sichtbar, dass der
   // Aktualisieren-Knopf gewirkt hat, auch wenn der DWD-Lauf derselbe bleibt.
   el("checked").textContent = view.fetchedAt ? `abgerufen ${hhmm(view.fetchedAt)}` : "";
-  el("headline").textContent = summary?.headline ?? "";
-  el("detail").textContent = summary?.detail ?? "";
 
   const banner = el("banner");
   if (["error", "offline", "noGeo"].includes(view.state)) {
@@ -623,6 +654,174 @@ export function render(view) {
   }
 
   if (view.places) renderPlaces(view.places, view.activePlaceId, view.editing);
+  const nav = el("places");
+  nav.hidden = !view.placesOpen;
+  el("places-btn").setAttribute("aria-pressed", view.placesOpen ? "true" : "false");
+}
+
+// Reiter umschalten. Der body-Zustand entscheidet, welche Ansicht sichtbar ist.
+export function setTab(tab) {
+  document.body.dataset.tab = tab;
+  for (const btn of document.querySelectorAll(".tab")) {
+    if (btn.dataset.tab === tab) btn.setAttribute("aria-current", "true");
+    else btn.removeAttribute("aria-current");
+  }
+}
+
+/** Zaehler an der Reiterleiste. 0 blendet ihn aus. */
+export function setAlertBadge(count) {
+  const b = el("tab-badge");
+  if (!b) return;
+  b.hidden = !count;
+  b.textContent = count > 9 ? "9+" : String(count ?? 0);
+}
+
+// Warnungen: eine Karte je Ereignisart, darin eine Zeile je Warnung mit der
+// amtlichen Warnstufe als farbigem Feld. Zeilen lassen sich aufklappen.
+function alertWhen(a) {
+  const from = a.onset ? hhmm(a.onset) : null;
+  const to = a.expires ? hhmm(a.expires) : null;
+  if (from && to) return `${from} bis ${to}`;
+  if (from) return `ab ${from}`;
+  if (to) return `bis ${to}`;
+  return "";
+}
+
+function alertRow(a) {
+  const row = document.createElement("button");
+  row.type = "button";
+  row.className = "alert-row";
+  row.setAttribute("aria-expanded", "false");
+
+  const lvl = document.createElement("span");
+  lvl.className = "lvl lvl-" + a.level;
+  lvl.textContent = String(a.level);
+
+  const body = document.createElement("div");
+  body.className = "alert-body";
+  const line = document.createElement("div");
+  line.className = "alert-line";
+  line.textContent = a.description || a.headline || levelLabel(a.level);
+  body.append(line);
+
+  const when = alertWhen(a);
+  if (when) {
+    const w = document.createElement("span");
+    w.className = "alert-when";
+    w.textContent = `${levelLabel(a.level)} · ${when}`;
+    body.append(w);
+  }
+
+  const extra = [a.headline, a.instruction].filter(Boolean);
+  if (extra.length) {
+    const more = document.createElement("div");
+    more.className = "alert-more";
+    for (const t of extra) {
+      const p = document.createElement("p");
+      p.textContent = t;
+      more.append(p);
+    }
+    body.append(more);
+    row.addEventListener("click", () => {
+      row.setAttribute("aria-expanded", row.getAttribute("aria-expanded") === "true" ? "false" : "true");
+    });
+  } else {
+    row.disabled = true;
+  }
+
+  row.append(lvl, body);
+  return row;
+}
+
+// Symbol je Ereignisart. Der DWD-Ereignisname ist der verlaesslichste Anker,
+// die Codes sind zahlreich und aendern sich. Ohne Treffer bleibt es beim Dreieck.
+const EVENT_ICONS = [
+  [/GEWITTER|BLITZ/, "i-bolt"],
+  [/BÖEN|STURM|ORKAN|WIND/, "i-wind"],
+  [/FROST|SCHNEE|GLÄTTE|GLATTEIS|KÄLTE/, "i-snow"],
+  [/REGEN|NIEDERSCHLAG|TAUWETTER/, "i-drop"],
+  [/HITZE|UV/, "i-heat"],
+  [/NEBEL/, "i-fog"],
+];
+
+function eventIcon(event) {
+  for (const [re, id] of EVENT_ICONS) if (re.test(event)) return id;
+  return "i-warn";
+}
+
+function alertCard(group) {
+  const card = document.createElement("section");
+  card.className = "card";
+  const head = document.createElement("h2");
+  head.className = "card-head";
+  head.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true" style="color:var(--lvl-${group.level})"><use href="#${eventIcon(group.event)}" /></svg>`;
+  head.append(document.createTextNode(group.event));
+  card.append(head);
+  for (const a of group.alerts) card.append(alertRow(a));
+  return card;
+}
+
+function emptyCard(icon, label, text) {
+  const card = document.createElement("section");
+  card.className = "card";
+  const head = document.createElement("h2");
+  head.className = "card-head";
+  head.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><use href="#${icon}" /></svg>`;
+  head.append(document.createTextNode(label));
+  const body = document.createElement("div");
+  body.className = "alert-empty";
+  const lvl = document.createElement("span");
+  lvl.className = "lvl lvl-0";
+  lvl.textContent = "0";
+  body.append(lvl, document.createTextNode(text));
+  card.append(head, body);
+  return card;
+}
+
+/**
+ * @param {{
+ *   state: string,
+ *   place?: {name: string},
+ *   alerts?: {groups: object[], count: number, location: object|null, fetchedAt: Date}|null,
+ *   error?: {kind: string}|null,
+ * }} view
+ */
+export function renderAlerts(view) {
+  const box = el("alerts-scroll");
+  if (!box) return;
+
+  const cell = view.alerts?.location?.name;
+  el("alerts-place").textContent = cell
+    ? `${view.place?.name ?? "Standort"} · Warnzelle ${cell}`
+    : view.place?.name ?? "Standort";
+
+  box.replaceChildren();
+
+  if (view.state === "loading" && !view.alerts) {
+    box.append(emptyCard("i-clock", "Status", "wird geladen"));
+    return;
+  }
+  if (["error", "offline"].includes(view.state) && !view.alerts) {
+    const kind = view.state === "offline" ? "offline" : view.error?.kind;
+    box.append(emptyCard("i-warn", "Status", ERR_TEXT[kind] ?? "Warnungen nicht abrufbar."));
+    return;
+  }
+
+  const data = view.alerts;
+  if (!data) return;
+
+  if (data.groups.length === 0) {
+    box.append(emptyCard("i-check", "Entwarnung", "keine amtlichen Warnungen"));
+  } else {
+    for (const g of data.groups) box.append(alertCard(g));
+  }
+
+  const foot = document.createElement("p");
+  foot.className = "alerts-foot";
+  foot.textContent = `Amtliche Warnungen des Deutschen Wetterdienstes, abgerufen ${hhmm(
+    data.fetchedAt
+  )}. Warnstufen 1 bis 4 nach dem DWD-Warnkonzept.`;
+  box.append(foot);
 }
 
 export { renderPlaces };
