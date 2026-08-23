@@ -195,14 +195,30 @@ body[data-refreshing] .refresh-glyph {
   color: var(--muted);
   min-width: 0;
 }
+/* Warnzellennamen des DWD werden lang. Hier darf die Zeile umbrechen, statt
+   den Namen abzuschneiden; im Hero bleibt sie einzeilig. */
 .place-line-left {
   justify-content: flex-start;
+  align-items: flex-start;
+  margin-top: 2px;
+  font-size: 15px;
+}
+.place-line-left .place-arrow {
   margin-top: 2px;
 }
 .place-line span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* Warnzellenname darf umbrechen statt abgeschnitten zu werden. Ohne min-width
+   schrumpft das Flex-Kind nicht unter seine Textbreite und bliebe einzeilig. */
+.place-line-left span {
+  flex: 1;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
 }
 .place-arrow {
   flex: none;

@@ -31,7 +31,30 @@ test("leere Antwort ergibt keine Gruppen", () => {
   const out = normalizeAlerts({ alerts: [], location: { name: "Berl. - Mitte", state: "Berlin" } });
   assert.equal(out.count, 0);
   assert.deepEqual(out.groups, []);
-  assert.deepEqual(out.location, { name: "Berl. - Mitte", state: "Berlin" });
+});
+
+test("Warnzelle: Kurzform gewinnt, der lange Name bleibt erhalten", () => {
+  const out = normalizeAlerts({
+    alerts: [],
+    location: {
+      name: "Mitgliedsgemeinde in Verwaltungsgemeinschaft Adelshofen",
+      name_short: "Adelshofen/AN",
+      district: "Ansbach",
+      state: "Bayern",
+    },
+  });
+  assert.deepEqual(out.location, {
+    name: "Adelshofen/AN",
+    fullName: "Mitgliedsgemeinde in Verwaltungsgemeinschaft Adelshofen",
+    district: "Ansbach",
+    state: "Bayern",
+  });
+});
+
+test("ohne Kurzform bleibt der lange Name stehen", () => {
+  const out = normalizeAlerts({ alerts: [], location: { name: "Berl. - Mitte", state: "Berlin" } });
+  assert.equal(out.location.name, "Berl. - Mitte");
+  assert.equal(out.location.district, null);
 });
 
 test("fehlendes alerts-Feld ist ein Formatfehler", () => {

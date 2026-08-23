@@ -48,7 +48,11 @@ function dedupeKey(a) {
 /**
  * Rohantwort -> { location, groups }. Gruppen nach Ereignisart, absteigend nach
  * Warnstufe und danach nach Beginn sortiert.
- * @returns {{ location: {name: string|null, state: string|null}|null, groups: AlertGroup[], count: number }}
+ * @returns {{
+ *   location: {name: string|null, fullName: string|null, district: string|null, state: string|null}|null,
+ *   groups: AlertGroup[],
+ *   count: number
+ * }}
  */
 export function normalizeAlerts(data) {
   const raw = Array.isArray(data?.alerts) ? data.alerts : null;
@@ -88,9 +92,18 @@ export function normalizeAlerts(data) {
   }
   groups.sort((a, b) => b.level - a.level || a.event.localeCompare(b.event, "de"));
 
+  // name ist der amtliche Warnzellenname und wird sehr lang ("Mitgliedsgemeinde
+  // in Verwaltungsgemeinschaft ..."), name_short ist die Kurzform des DWD.
   const loc = data?.location ?? null;
   return {
-    location: loc ? { name: loc.name ?? null, state: loc.state ?? null } : null,
+    location: loc
+      ? {
+          name: loc.name_short ?? loc.name ?? null,
+          fullName: loc.name ?? null,
+          district: loc.district ?? null,
+          state: loc.state ?? null,
+        }
+      : null,
     groups,
     count: alerts.length,
   };
