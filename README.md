@@ -93,13 +93,18 @@ Versalien-Kopfzeile. Symbole sind Inline-SVG im Dokument (`<symbol>` plus
 Unten liegt die Reiterleiste. Am Reiter *Warnungen* zeigt ein Zähler die Anzahl
 der aktiven Warnungen.
 
-Der Regen-Reiter füllt auf üblichen Telefonen genau eine Bildschirmhöhe
-(`100dvh`), gescrollt wird nicht; die Radar-Karte nimmt den Platz, der nach Hero
-und Vorhersage-Karte übrig bleibt. Auf sehr niedrigen Fenstern wird gescrollt
-statt abgeschnitten. Das DWD-Raster wird formatfüllend gezeichnet und am
-Standort ausgerichtet, der dadurch immer exakt in der Kartenmitte sitzt. Die
-Orts-Auswahl und das Formular zum Anlegen eines Ortes kommen als Blatt über die
-Seite, damit sie das Layout nicht sprengen.
+Im Regen-Reiter scrollen Hero, Vorhersage- und Radar-Karte gemeinsam. Die
+Kartengröße folgt daraus, dass Zeitleiste und Karte zusammen ins Bild passen
+müssen: das Wischen über die Leiste zeigt den jeweiligen Frame auf der Karte,
+und daran liest man den Zug des Regens ab. Nach unten ist die Karte deshalb auf
+ein etwa quadratisches Format begrenzt (`min(78vw, 380px)`), nach oben auf die
+Fensterhöhe abzüglich Kopfzeile, Reiterleiste und Vorhersage-Karte; auf hohen
+Fenstern wächst sie in den freien Platz.
+
+Das DWD-Raster wird formatfüllend gezeichnet und am Standort ausgerichtet, der
+dadurch immer exakt in der Kartenmitte sitzt. Die Orts-Auswahl und das Formular
+zum Anlegen eines Ortes kommen als Blatt über die Seite, damit sie das Layout
+nicht sprengen.
 
 ## Bedienung und Aktualisierung
 
