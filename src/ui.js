@@ -790,10 +790,11 @@ export function renderAlerts(view) {
   const box = el("alerts-scroll");
   if (!box) return;
 
-  const cell = view.alerts?.location?.name;
-  el("alerts-place").textContent = cell
-    ? `${view.place?.name ?? "Standort"} · Warnzelle ${cell}`
-    : view.place?.name ?? "Standort";
+  const cell = view.alerts?.location;
+  const place = view.place?.name ?? "Standort";
+  el("alerts-place").textContent = cell?.name ? `${place} · Warnzelle ${cell.name}` : place;
+  // Der volle Warnzellenname als Titel, falls die Kurzform nicht eindeutig ist.
+  el("alerts-place").title = cell?.fullName ?? "";
 
   box.replaceChildren();
 

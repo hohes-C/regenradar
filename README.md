@@ -212,6 +212,11 @@ der Koordinaten. `severity` wird auf die DWD-Warnstufe abgebildet:
 | `severe` | 3 | Unwetterwarnung |
 | `extreme` | 4 | Extremes Unwetter |
 
+Als Warnzellenname wird `name_short` bevorzugt: `name` ist der amtliche Name
+und wird lang ("Mitgliedsgemeinde in Verwaltungsgemeinschaft Adelshofen"), die
+Kurzform lautet dann "Adelshofen/AN". Der volle Name bleibt als `title` am
+Element erhalten, und die Zeile bricht um, statt abgeschnitten zu werden.
+
 Der DWD gibt dieselbe Warnung für jede betroffene Warnzelle einzeln aus.
 `normalizeAlerts` fasst Meldungen mit gleicher Ereignisart, Stufe, Zeitspanne
 und gleichem Text zu einer zusammen und gruppiert danach nach Ereignisart
