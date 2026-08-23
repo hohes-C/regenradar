@@ -426,9 +426,12 @@ body[data-refreshing] .refresh-glyph {
 }
 
 /* Radar-Karte. Nimmt den Platz, der nach den anderen Karten uebrig bleibt. */
-/* Die Radar-Karte waechst auf hohen Fenstern in den freien Platz, schrumpft
-   aber nie unter ein etwa quadratisches Format. Auf niedrigen Fenstern wird
-   dafuer gescrollt: eine lesbare Karte ist wichtiger als eine Seite ohne Scroll. */
+/* Die Radar-Karte waechst auf hohen Fenstern in den freien Platz. Nach unten
+   gilt ein etwa quadratisches Format, nach oben begrenzt sie die Fensterhoehe:
+   Zeitleiste und Karte muessen zusammen sichtbar bleiben, sonst laesst sich der
+   Zug des Regens beim Schrubben ueber die Leiste nicht mehr ablesen. Der Hero
+   scrollt dafuer mit weg (die 364px sind Kopfzeile, Reiterleiste, Abstaende und
+   die Vorhersage-Karte). */
 .card-radar {
   flex: 1 0 auto;
   display: flex;
@@ -436,7 +439,7 @@ body[data-refreshing] .refresh-glyph {
 }
 .card-radar .radar-canvas-wrap {
   flex: 1;
-  min-height: min(78vw, 380px);
+  min-height: max(190px, min(78vw, 380px, 100dvh - 364px));
 }
 .radar-canvas-wrap {
   position: relative;
