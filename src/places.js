@@ -86,6 +86,7 @@ export function loadLast(id) {
     fetchedAt: new Date(o.fetchedAt),
     runTime: o.runTime ? new Date(o.runTime) : null,
     center: o.center,
+    coords: o.coords ?? null,
     frames: o.frames.map((f) => ({
       validTime: new Date(f.validTime),
       grid: f.grid,

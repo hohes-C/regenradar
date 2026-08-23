@@ -29,7 +29,8 @@ export const STALE_MIN = 15; // Datenalter, ab dem gewarnt wird
 export const VERY_STALE_MIN = 30; // Datenalter, ab dem die Vorhersage unbrauchbar ist
 
 // Refresh und Netz.
-export const REFRESH_MS = 300000; // Intervall bei sichtbarer App
+export const REFRESH_MS = 300000; // Intervall fuer neue Netz-Abfragen bei sichtbarer App
+export const CLOCK_MS = 30000; // Intervall, in dem die Anzeige gegen die Uhr neu gerechnet wird
 export const MIN_REFETCH_MS = 300000; // juengere Ergebnisse nicht neu laden
 export const FETCH_TIMEOUT_MS = 10000;
 

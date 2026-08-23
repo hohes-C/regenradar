@@ -146,7 +146,11 @@ export async function fetchRadarSeries({ lat, lon, now, fetchImpl }) {
 
   let res;
   try {
-    res = await doFetch(url, { signal: controller.signal, headers: { Accept: "application/json" } });
+    res = await doFetch(url, {
+      signal: controller.signal,
+      cache: "no-store", // nie aus dem HTTP-Cache, sonst haengt die Vorschau an einem alten Lauf
+      headers: { Accept: "application/json" },
+    });
   } catch (err) {
     clearTimeout(timer);
     if (err && (err.name === "AbortError" || controller.signal.aborted)) {
