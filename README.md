@@ -1,11 +1,17 @@
 # Regenradar
 
-Statische mobile PWA für Safari auf dem iPhone. Beantwortet eine Frage: Wann
-regnet es hier in den nächsten 120 Minuten und wie stark. Ein Screen mit einer
-Zeitleiste (per Wischen abtastbar) und darunter einer Radar-Karte des
-Niederschlags um den Standort (aus den DWD-Daten gezeichnet, über einem
-OpenStreetMap-Kachelhintergrund). Datenbasis ist der DWD-Radar-Nowcast
-(Produkt RV) über die [Bright-Sky-API](https://brightsky.dev/).
+Statische mobile PWA für Safari auf dem iPhone. Zwei Reiter:
+
+- **Regen** beantwortet eine Frage: Wann regnet es hier in den nächsten 120
+  Minuten und wie stark. Kurzfassung als Überschrift, darunter eine Zeitleiste
+  (per Wischen abtastbar) und eine Radar-Karte des Niederschlags um den Standort
+  (aus den DWD-Daten gezeichnet, über einem OpenStreetMap-Kachelhintergrund).
+  Datenbasis ist der DWD-Radar-Nowcast (Produkt RV).
+- **Warnungen** zeigt die amtlichen DWD-Warnmeldungen für die Warnzelle des
+  Ortes, gruppiert nach Ereignisart und mit der Warnstufe 1 bis 4. Ein Tippen
+  auf eine Zeile klappt Überschrift und Verhaltenshinweis auf.
+
+Beides über die [Bright-Sky-API](https://brightsky.dev/).
 
 Kein Backend, kein Framework, kein Bundler, keine Laufzeitabhängigkeiten. Plain
 HTML, CSS und ES-Module. Die App spricht direkt mit `api.brightsky.dev` und lädt
@@ -20,7 +26,8 @@ manifest.webmanifest  PWA-Manifest
 sw.js                 Service Worker (Root, Scope "./")
 src/
   config.js           alle Konstanten und Schwellen
-  api.js              Bright Sky -> RadarSeries (einziges Modul mit API-Wissen)
+  api.js              Bright Sky /radar -> RadarSeries (einziges Modul mit API-Wissen)
+  alerts.js           Bright Sky /alerts -> gruppierte DWD-Warnungen
   nowcast.js          RadarSeries -> Nowcast (rein, ohne DOM, ohne Date.now())
   text.js             Nowcast -> deutsche Sätze (rein)
   places.js           gespeicherte Orte in localStorage
@@ -69,25 +76,41 @@ npm run explore    # ruft Bright Sky für einen Beispielort (Berlin), schreibt t
 
 Über den URL-Parameter `?state=` lässt sich jeder Zustand ohne Netz zeigen:
 
-`loading`, `ok`, `stale`, `veryStale`, `error`, `offline`, `noGeo`,
-`noCoverage`. Beispiel: `http://localhost:8000/?state=veryStale`. Der Debug-Pfad
+`loading`, `ok`, `rainNow`, `stale`, `veryStale`, `error`, `offline`, `noGeo`,
+`noCoverage` sowie `alerts` und `alertsEmpty` für den Warnungen-Reiter.
+Beispiel: `http://localhost:8000/?state=veryStale`. Der Debug-Pfad
 (`src/debug.js`) wird nur bei gesetztem Parameter dynamisch geladen und kostet im
 Normalbetrieb nichts.
 
-## Bedienung und Aktualisierung
+## Oberfläche
 
-Die App füllt genau eine Bildschirmhöhe (`100dvh`), gescrollt wird nicht. Die
-Radar-Karte nimmt den Platz, der nach Überschrift, Zeitleiste, Orten und Legende
-übrig bleibt; das DWD-Raster wird formatfüllend gezeichnet und am Standort
-ausgerichtet, der dadurch immer exakt in der Kartenmitte sitzt. Das Formular zum
-Anlegen eines Ortes kommt als Sheet über die Seite, damit es das Layout nicht
-sprengt.
+Ein Farbschema, dunkles Violett mit Verlauf, bewusst ohne Light-Mode-Variante:
+so wirken die Radarfarben überall gleich. Runde Systemschrift (`ui-rounded`, auf
+iOS SF Pro Rounded), Inhalte in halbtransparenten Karten mit kleiner
+Versalien-Kopfzeile. Symbole sind Inline-SVG im Dokument (`<symbol>` plus
+`<use>`), es werden keine Schrift- oder Bilddateien nachgeladen.
+
+Unten liegt die Reiterleiste. Am Reiter *Warnungen* zeigt ein Zähler die Anzahl
+der aktiven Warnungen.
+
+Der Regen-Reiter füllt auf üblichen Telefonen genau eine Bildschirmhöhe
+(`100dvh`), gescrollt wird nicht; die Radar-Karte nimmt den Platz, der nach Hero
+und Vorhersage-Karte übrig bleibt. Auf sehr niedrigen Fenstern wird gescrollt
+statt abgeschnitten. Das DWD-Raster wird formatfüllend gezeichnet und am
+Standort ausgerichtet, der dadurch immer exakt in der Kartenmitte sitzt. Die
+Orts-Auswahl und das Formular zum Anlegen eines Ortes kommen als Blatt über die
+Seite, damit sie das Layout nicht sprengen.
+
+## Bedienung und Aktualisierung
 
 Der Knopf oben rechts aktualisiert alles in einem Schritt: neue
 Standortbestimmung (`maximumAge: 0`, also keine gecachte Position), neue
-Radardaten am DWD vorbei an jedem Cache (`cache: "no-store"`) und eine
+Radardaten und Warnungen am HTTP-Cache vorbei (`cache: "no-store"`) und eine
 Neuberechnung der Anzeige gegen die aktuelle Uhr. Der Ring dreht sich, solange
 das läuft.
+
+Radar und Warnungen werden getrennt geladen: ein Fehler in der einen Abfrage
+lässt die andere Ansicht stehen.
 
 Unabhängig davon rechnet die App die Anzeige alle `CLOCK_MS` gegen die Uhr neu
 und ebenso, sobald sie wieder sichtbar wird. Ohne das hingen "jetzt", die
@@ -171,6 +194,27 @@ werden nie gecacht.
 Hosting deployen oder den lokalen Server über einen HTTPS-Tunnel verfügbar machen
 (Tailscale Serve oder cloudflared). Danach in Safari über "Zum Home-Bildschirm"
 installieren; die App startet im Vollbild.
+
+## Warnungen
+
+`/alerts?lat=&lon=` liefert die amtlichen DWD-Warnungen (CAP) für die Warnzelle
+der Koordinaten. `severity` wird auf die DWD-Warnstufe abgebildet:
+
+| CAP-Severity | Stufe | Bezeichnung |
+| --- | --- | --- |
+| `minor` | 1 | Wetterwarnung |
+| `moderate` | 2 | Markantes Wetter |
+| `severe` | 3 | Unwetterwarnung |
+| `extreme` | 4 | Extremes Unwetter |
+
+Der DWD gibt dieselbe Warnung für jede betroffene Warnzelle einzeln aus.
+`normalizeAlerts` fasst Meldungen mit gleicher Ereignisart, Stufe, Zeitspanne
+und gleichem Text zu einer zusammen und gruppiert danach nach Ereignisart
+(absteigend nach Warnstufe).
+
+Nicht enthalten sind die Gesundheits- und Umweltindizes der DWD-WarnWetter-App
+(Pollen, Biowetter, UV-Index, Bodenfeuchte, Brandgefahr). Die kommen aus einem
+eigenen DWD-Dienst, den Bright Sky nicht anbietet.
 
 ## Datenquelle
 

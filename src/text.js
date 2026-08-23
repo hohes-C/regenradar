@@ -77,18 +77,51 @@ function buildStatus(nowcast) {
   return status;
 }
 
+function cap(s) {
+  return s ? s[0].toUpperCase() + s.slice(1) : s;
+}
+
+// Kurzform fuer die grosse Ueberschrift: wenige Worte, notfalls mit Uhrzeit.
+// Der ausfuehrliche Satz steht weiterhin in `headline`.
+function buildTitle(nowcast) {
+  const { coverage, events, isolatedFrames, current } = nowcast;
+  if (coverage === "none") return "Keine Radardaten";
+  if (events.length === 0) {
+    return isolatedFrames.length > 0 ? "Vereinzelt Tropfen" : "Kein Regen";
+  }
+  const e = events[0];
+  if (e.startsNow) return `${cap(ADJ[current.category])} Regen jetzt`;
+  if (e.uncertain) return `Vielleicht Regen um ${hhmm(e.start)}`;
+  const adj = ADJ[e.peakCategory];
+  if (minutesUntil(e.start, nowcast.now) < 3) return `Gleich ${adj} Regen`;
+  return `${cap(adj)} Regen um ${hhmm(e.start)}`;
+}
+
+/**
+ * Bildsymbol fuer den Hero-Bereich: trocken, Regen kommt, es regnet.
+ * @returns {"dry"|"soon"|"rain"}
+ */
+function buildIcon(nowcast) {
+  if (nowcast.coverage === "none") return "dry";
+  const e = nowcast.events[0];
+  if (!e) return "dry";
+  return e.startsNow ? "rain" : "soon";
+}
+
 /**
  * @param {ReturnType<import('./nowcast.js').computeNowcast>} nowcast
- * @returns {{ headline: string, detail: string|null, status: string }}
+ * @returns {{ title: string, icon: string, headline: string, detail: string|null, status: string }}
  */
 export function summarize(nowcast) {
   const status = buildStatus(nowcast);
+  const title = buildTitle(nowcast);
+  const icon = buildIcon(nowcast);
   const { coverage, events, isolatedFrames, current, now } = nowcast;
 
   let headline;
   if (coverage === "none") {
     headline = "Keine Radardaten für diesen Ort.";
-    return { headline, detail: null, status };
+    return { title, icon, headline, detail: null, status };
   }
 
   if (events.length === 0) {
@@ -99,7 +132,7 @@ export function summarize(nowcast) {
     } else {
       headline = "Kein Regen in den nächsten 2 Stunden.";
     }
-    return { headline, detail: null, status };
+    return { title, icon, headline, detail: null, status };
   }
 
   const e = events[0];
@@ -114,13 +147,13 @@ export function summarize(nowcast) {
         e.end
       )} nach.`;
     }
-    return { headline, detail: buildDetail(nowcast), status };
+    return { title, icon, headline, detail: buildDetail(nowcast), status };
   }
 
   // Kuenftiges Ereignis.
   if (e.uncertain) {
     headline = `Tendenz: ab etwa ${hhmm(e.start)} möglicherweise ${ADJ[e.peakCategory]} Regen.`;
-    return { headline, detail: buildDetail(nowcast), status };
+    return { title, icon, headline, detail: buildDetail(nowcast), status };
   }
 
   const adj = ADJ[e.peakCategory];
@@ -135,5 +168,5 @@ export function summarize(nowcast) {
   } else {
     headline = `Trocken bis etwa ${hhmm(e.start)}, dann ${adj} Regen bis ${peak} mm/h, ${dur}.`;
   }
-  return { headline, detail: buildDetail(nowcast), status };
+  return { title, icon, headline, detail: buildDetail(nowcast), status };
 }
