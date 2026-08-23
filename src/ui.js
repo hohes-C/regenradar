@@ -230,6 +230,18 @@ function cssColors() {
   };
 }
 
+// Geometrie des Rasters auf der Zeichenflaeche. Zellen bleiben quadratisch
+// (1 Zelle = 1 km), das Raster fuellt den Kasten formatfuellend und wird am
+// Standort ausgerichtet, der dadurch immer exakt in der Mitte sitzt.
+function gridGeom(w, h, rows, cols, center) {
+  const cell = Math.max(w / cols, h / rows);
+  return {
+    cell,
+    ox: w / 2 - (center.col + 0.5) * cell,
+    oy: h / 2 - (center.row + 0.5) * cell,
+  };
+}
+
 function drawRadar(canvas, grid, center) {
   const ctx = canvas.getContext("2d");
   const rows = Array.isArray(grid) ? grid.length : 0;
@@ -243,8 +255,7 @@ function drawRadar(canvas, grid, center) {
   ctx.clearRect(0, 0, w, h);
   if (!rows || !cols) return;
 
-  const cw = w / cols;
-  const ch = h / rows;
+  const { cell, ox, oy } = gridGeom(w, h, rows, cols, center);
   const col = cssColors();
   const colorFor = (cat) =>
     cat === "light" ? col.light : cat === "moderate" ? col.moderate : cat === "strong" ? col.strong : cat === "extreme" ? col.extreme : null;
@@ -253,12 +264,16 @@ function drawRadar(canvas, grid, center) {
   for (let r = 0; r < rows; r++) {
     const row = grid[r];
     if (!Array.isArray(row)) continue;
+    const y = oy + r * cell;
+    if (y + cell < 0 || y > h) continue;
     for (let c = 0; c < cols; c++) {
+      const x = ox + c * cell;
+      if (x + cell < 0 || x > w) continue;
       const v = row[c];
       if (v === null || v === undefined) {
         ctx.globalAlpha = 0.12;
         ctx.fillStyle = "#808080";
-        ctx.fillRect(c * cw, r * ch, cw + 0.6, ch + 0.6);
+        ctx.fillRect(x, y, cell + 0.6, cell + 0.6);
         ctx.globalAlpha = 0.85;
         continue;
       }
@@ -267,14 +282,14 @@ function drawRadar(canvas, grid, center) {
       const color = colorFor(categorize(mmh, CONFIG));
       if (!color) continue;
       ctx.fillStyle = color;
-      ctx.fillRect(c * cw, r * ch, cw + 0.6, ch + 0.6);
+      ctx.fillRect(x, y, cell + 0.6, cell + 0.6);
     }
   }
   ctx.globalAlpha = 1;
 
-  // Reichweitenring und Standortmarke.
-  const cx = (center.col + 0.5) * cw;
-  const cy = (center.row + 0.5) * ch;
+  // Reichweitenring und Standortmarke, immer in der Mitte.
+  const cx = w / 2;
+  const cy = h / 2;
   ctx.strokeStyle = "rgba(127,127,127,0.35)";
   ctx.lineWidth = 1;
   ctx.beginPath();
@@ -288,9 +303,9 @@ function drawRadar(canvas, grid, center) {
   ctx.strokeStyle = "rgba(0,0,0,0.55)";
   ctx.stroke();
 
-  // Metrischer Maßstab. DWD RV ist ein 1-km-Raster, also 1 Zelle = 1 km und cw
-  // sind exakt die Pixel pro Kilometer. Kein Projektionsfehler.
-  drawScaleBar(ctx, w, h, cw, col);
+  // Metrischer Maßstab. DWD RV ist ein 1-km-Raster, also 1 Zelle = 1 km und
+  // `cell` sind exakt die Pixel pro Kilometer. Kein Projektionsfehler.
+  drawScaleBar(ctx, w, h, cell, col);
 }
 
 function drawScaleBar(ctx, w, h, pxPerKm, col) {
@@ -384,18 +399,17 @@ function renderMapBackground(grid) {
   }
 
   const dpr = window.devicePixelRatio || 1;
-  const cw = w / cols; // Pixel pro Kilometer (waagerecht)
-  const ch = h / rows;
-  const mCanvasX = (center.col + 0.5) * cw;
-  const mCanvasY = (center.row + 0.5) * ch;
-  const mPerPx = 1000 / cw; // Meter pro Canvas-Pixel
+  const { cell } = gridGeom(w, h, rows, cols, center); // Pixel pro Kilometer
+  const mCanvasX = w / 2; // Standort sitzt in der Mitte der Flaeche
+  const mCanvasY = h / 2;
+  const mPerPx = 1000 / cell; // Meter pro Canvas-Pixel
   const latRad = (coords.lat * Math.PI) / 180;
   const worldMPerPx = 156543.03392 * Math.cos(latRad); // bei Zoom 0
   const z = Math.max(3, Math.min(19, Math.round(Math.log2(worldMPerPx / mPerPx))));
   const tileMPerPx = worldMPerPx / 2 ** z;
   const s = tileMPerPx / mPerPx; // Canvas-Pixel pro Weltpixel
 
-  const key = `${z}|${coords.lat},${coords.lon}|${center.row},${center.col}|${cols}x${rows}|${w}x${h}@${dpr}`;
+  const key = `${z}|${coords.lat},${coords.lon}|${cols}x${rows}|${w}x${h}@${dpr}`;
   if (key === mapKey) return; // gleicher Ausschnitt, kein Neuladen
   mapKey = key;
 
@@ -575,6 +589,7 @@ export function closePlaceForm() {
  *   places?: {id: string, name: string}[],
  *   activePlaceId?: string,
  *   editing?: boolean,
+ *   fetchedAt?: Date|null,
  * }} view
  */
 export function render(view) {
@@ -584,6 +599,9 @@ export function render(view) {
 
   const summary = view.summary;
   el("status").textContent = summary?.status ?? (view.state === "loading" ? "Wird geladen" : "");
+  // Zeitpunkt des letzten erfolgreichen Abrufs. Macht sichtbar, dass der
+  // Aktualisieren-Knopf gewirkt hat, auch wenn der DWD-Lauf derselbe bleibt.
+  el("checked").textContent = view.fetchedAt ? `abgerufen ${hhmm(view.fetchedAt)}` : "";
   el("headline").textContent = summary?.headline ?? "";
   el("detail").textContent = summary?.detail ?? "";
 

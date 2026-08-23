@@ -75,7 +75,14 @@ export function renderDebug(stateName) {
   };
   const show = (state, series, extra = {}) => {
     const { nowcast, summary } = ncFrom(series);
-    render(base({ state, summary, nowcast, ...extra }));
+    render(base({
+      state,
+      summary,
+      nowcast,
+      coords: series.coords,
+      fetchedAt: series.fetchedAt,
+      ...extra,
+    }));
   };
 
   switch (stateName) {

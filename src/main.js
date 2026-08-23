@@ -9,6 +9,7 @@ import {
   COORD_DECIMALS,
   MIN_REFETCH_MS,
   REFRESH_MS,
+  CLOCK_MS,
   GEO_MAX_AGE_MS,
   GEO_TIMEOUT_MS,
 } from "./config.js";
@@ -32,7 +33,9 @@ const state = {
   activeId: "geo",
   editing: false,
   loading: false,
-  timer: null,
+  timer: null, // Netz-Poll
+  clock: null, // Neuberechnung gegen die Uhr
+  series: null, // zuletzt geladene RadarSeries des aktiven Ortes
   render: null, // { summary, nowcast } zuletzt gezeigt
   geoName: null, // { key, name } aufgeloester Standortname
   currentState: "loading",
@@ -91,18 +94,31 @@ function baseView(extra) {
     summary: state.render?.summary ?? null,
     nowcast: state.render?.nowcast ?? null,
     coords: activeCoords(),
+    fetchedAt: state.series?.fetchedAt ?? null,
     ...extra,
   };
 }
 
 function renderResult(series, now) {
+  state.series = series;
   const nowcast = computeNowcast(series, now, CONFIG);
   const summary = summarize(nowcast);
   state.render = { summary, nowcast };
   paint(baseView({ state: visualState(nowcast), summary, nowcast }));
 }
 
-function getGeo() {
+// Anzeige gegen die aktuelle Uhr neu rechnen, ohne Netz. Ohne das haengen
+// Zeitleiste, Ticks und "jetzt" bis zur naechsten erfolgreichen Abfrage an der
+// Uhrzeit des letzten Abrufs.
+function retick() {
+  if (!state.series || state.loading) return;
+  // Fehler- und Offline-Banner nicht durch ein reines Uhr-Update wegwischen.
+  if (["error", "offline", "noGeo"].includes(state.currentState)) return;
+  renderResult(state.series, new Date());
+}
+
+// `fresh` erzwingt eine neue Standortbestimmung statt einer gecachten Position.
+function getGeo({ fresh = false } = {}) {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
       reject(new Error("Geolocation nicht verfügbar"));
@@ -111,7 +127,11 @@ function getGeo() {
     navigator.geolocation.getCurrentPosition(
       (pos) => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
       (err) => reject(err),
-      { enableHighAccuracy: false, maximumAge: GEO_MAX_AGE_MS, timeout: GEO_TIMEOUT_MS }
+      {
+        enableHighAccuracy: false,
+        maximumAge: fresh ? 0 : GEO_MAX_AGE_MS,
+        timeout: GEO_TIMEOUT_MS,
+      }
     );
   });
 }
@@ -147,7 +167,7 @@ async function load(force = false) {
     let coords;
     if (id === "geo") {
       try {
-        coords = await getGeo();
+        coords = await getGeo({ fresh: force });
       } catch {
         handleNoGeo();
         return;
@@ -189,8 +209,9 @@ function activate(id) {
   closePlaceForm();
 
   const cached = loadLast(id);
-  if (cached) renderResult(cached, cached.fetchedAt);
+  if (cached) renderResult(cached, new Date());
   else {
+    state.series = null;
     state.render = null;
     paint(baseView({ state: "loading" }));
   }
@@ -198,13 +219,15 @@ function activate(id) {
 }
 
 function startPolling() {
-  if (state.timer) return;
-  state.timer = setInterval(() => load(false), REFRESH_MS);
+  if (!state.timer) state.timer = setInterval(() => load(false), REFRESH_MS);
+  if (!state.clock) state.clock = setInterval(retick, CLOCK_MS);
 }
 
 function stopPolling() {
   clearInterval(state.timer);
+  clearInterval(state.clock);
   state.timer = null;
+  state.clock = null;
 }
 
 function onAddSubmit({ name, lat, lon, useGeo }) {
@@ -225,9 +248,22 @@ function onAddSubmit({ name, lat, lon, useGeo }) {
   }
 }
 
+// Ein Knopf fuer alles: neuer Standort, neue Radardaten, neu gerechnete Anzeige.
+// Der Spinner laeuft ueber die gesamte Dauer, auch wenn zwischendurch nicht
+// neu gezeichnet wird.
+async function refreshAll() {
+  if (state.loading) return;
+  document.body.dataset.refreshing = "1";
+  try {
+    await load(true);
+  } finally {
+    delete document.body.dataset.refreshing;
+  }
+}
+
 function wireEvents() {
-  document.getElementById("refresh").addEventListener("click", () => load(true));
-  document.getElementById("retry").addEventListener("click", () => load(true));
+  document.getElementById("refresh").addEventListener("click", refreshAll);
+  document.getElementById("retry").addEventListener("click", refreshAll);
   window.addEventListener("online", () => load(false));
 
   document.getElementById("places").addEventListener("click", (e) => {
@@ -261,6 +297,7 @@ function wireEvents() {
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") {
       startPolling();
+      retick(); // sofort auf die aktuelle Uhrzeit, auch ohne neue Daten
       load(false);
     } else {
       stopPolling();

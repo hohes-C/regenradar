@@ -74,6 +74,27 @@ npm run explore    # ruft Bright Sky für einen Beispielort (Berlin), schreibt t
 (`src/debug.js`) wird nur bei gesetztem Parameter dynamisch geladen und kostet im
 Normalbetrieb nichts.
 
+## Bedienung und Aktualisierung
+
+Die App füllt genau eine Bildschirmhöhe (`100dvh`), gescrollt wird nicht. Die
+Radar-Karte nimmt den Platz, der nach Überschrift, Zeitleiste, Orten und Legende
+übrig bleibt; das DWD-Raster wird formatfüllend gezeichnet und am Standort
+ausgerichtet, der dadurch immer exakt in der Kartenmitte sitzt. Das Formular zum
+Anlegen eines Ortes kommt als Sheet über die Seite, damit es das Layout nicht
+sprengt.
+
+Der Knopf oben rechts aktualisiert alles in einem Schritt: neue
+Standortbestimmung (`maximumAge: 0`, also keine gecachte Position), neue
+Radardaten am DWD vorbei an jedem Cache (`cache: "no-store"`) und eine
+Neuberechnung der Anzeige gegen die aktuelle Uhr. Der Ring dreht sich, solange
+das läuft.
+
+Unabhängig davon rechnet die App die Anzeige alle `CLOCK_MS` gegen die Uhr neu
+und ebenso, sobald sie wieder sichtbar wird. Ohne das hingen "jetzt", die
+Zeitleiste und die Ticks bis zur nächsten erfolgreichen Netz-Abfrage an der
+Uhrzeit des letzten Abrufs. Die Statuszeile zeigt neben dem Zeitstempel des
+DWD-Laufs ("Stand") auch, wann zuletzt abgerufen wurde.
+
 ## Konfiguration
 
 Alle Werte in `src/config.js`. Schwellen und Fenster nur dort ändern, nie hart
@@ -98,10 +119,11 @@ im Code.
 | `MAX_GAP_FRAMES` | 1 | so viele trockene Frames überbrückt ein Ereignis |
 | `STALE_MIN` | 15 | Datenalter, ab dem gewarnt wird |
 | `VERY_STALE_MIN` | 30 | Datenalter, ab dem die Vorhersage als unbrauchbar gilt |
-| `REFRESH_MS` | 300000 | Intervall bei sichtbarer App |
+| `REFRESH_MS` | 300000 | Intervall für neue Netz-Abfragen bei sichtbarer App |
+| `CLOCK_MS` | 30000 | Intervall, in dem die Anzeige gegen die Uhr neu gerechnet wird |
 | `MIN_REFETCH_MS` | 300000 | jüngere Ergebnisse werden nicht neu geladen |
 | `FETCH_TIMEOUT_MS` | 10000 | Timeout einer Anfrage |
-| `GEO_MAX_AGE_MS` | 300000 | maximumAge für Geolocation |
+| `GEO_MAX_AGE_MS` | 300000 | maximumAge für Geolocation (beim manuellen Aktualisieren 0) |
 | `GEO_TIMEOUT_MS` | 10000 | Timeout für Geolocation |
 | `COORD_DECIMALS` | 3 | Rundung der Koordinaten vor der Anfrage |
 
