@@ -98,13 +98,16 @@ Ausgenommen sind die Fußzeile im Warnungen-Reiter und die Eingabefelder.
 Unten liegt die Reiterleiste. Am Reiter *Warnungen* zeigt ein Zähler die Anzahl
 der aktiven Warnungen.
 
-Im Regen-Reiter scrollen Hero, Vorhersage- und Radar-Karte gemeinsam. Die
-Kartengröße folgt daraus, dass Zeitleiste und Karte zusammen ins Bild passen
-müssen: das Wischen über die Leiste zeigt den jeweiligen Frame auf der Karte,
-und daran liest man den Zug des Regens ab. Nach unten ist die Karte deshalb auf
-ein etwa quadratisches Format begrenzt (`min(78vw, 380px)`), nach oben auf die
-Fensterhöhe abzüglich Kopfzeile, Reiterleiste und Vorhersage-Karte; auf hohen
-Fenstern wächst sie in den freien Platz.
+Im Regen-Reiter scrollen Hero, Vorhersage- und Radar-Karte gemeinsam, auf
+üblichen Telefonen ist aber alles ohne Scrollen im Bild. Dafür ist der Hero eine
+flache Zeile: Wettersymbol, Kurzfassung und darunter klein der Ort.
+
+Die Kartengröße folgt daraus, dass Zeitleiste und Karte zusammen sichtbar
+bleiben müssen: das Wischen über die Leiste zeigt den jeweiligen Frame auf der
+Karte, und daran liest man den Zug des Regens ab. Nach unten ist die Karte auf
+ein etwa quadratisches Format begrenzt (`min(78vw, 340px)`), nach oben auf die
+Fensterhöhe abzüglich Kopfzeile, Hero, Vorhersage-Karte und Reiterleiste; auf
+hohen Fenstern wächst sie in den freien Platz.
 
 Das DWD-Raster wird formatfüllend gezeichnet und am Standort ausgerichtet, der
 dadurch immer exakt in der Kartenmitte sitzt. Die Orts-Auswahl und das Formular
