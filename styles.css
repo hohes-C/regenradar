@@ -57,6 +57,20 @@ body {
   color: var(--text);
   background: #2a2140;
   -webkit-font-smoothing: antialiased;
+  /* App-Oberflaeche, kein Dokument: das Wischen ueber die Zeitleiste zog sonst
+     eine Textmarkierung auf und iOS blendete Griffe und Lupe ein. Wo Text
+     wirklich zum Kopieren da ist, wird die Auswahl unten wieder erlaubt. */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Wo Text zum Lesen und Kopieren da ist, bleibt die Auswahl erlaubt. Die
+   Warnzeilen selbst sind Knoepfe, in denen der Browser ohnehin nicht markiert. */
+.alerts-foot,
+.place-form input {
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 /* Der Verlauf liegt fix hinter der App, damit er beim Scrollen steht. */
