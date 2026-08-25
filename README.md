@@ -90,6 +90,11 @@ iOS SF Pro Rounded), Inhalte in halbtransparenten Karten mit kleiner
 Versalien-Kopfzeile. Symbole sind Inline-SVG im Dokument (`<symbol>` plus
 `<use>`), es werden keine Schrift- oder Bilddateien nachgeladen.
 
+Die Oberfläche verhält sich wie eine App, nicht wie ein Dokument: Textauswahl
+ist per `user-select: none` abgeschaltet, sonst zog das Wischen über die
+Zeitleiste eine Markierung auf und iOS blendete Auswahlgriffe und Lupe ein.
+Ausgenommen sind die Fußzeile im Warnungen-Reiter und die Eingabefelder.
+
 Unten liegt die Reiterleiste. Am Reiter *Warnungen* zeigt ein Zähler die Anzahl
 der aktiven Warnungen.
 
