@@ -182,33 +182,53 @@ export async function fetchRadarSeries({ lat, lon, now, fetchImpl }) {
 }
 
 /**
- * Name der naechstgelegenen DWD-Station als Ortslabel. Dekorativ, wirft nie:
- * bei jedem Fehler kommt null zurueck. Bleibt bei der einen erlaubten API.
+ * Aktuelle Messwerte der naechstgelegenen DWD-Station: Temperatur und
+ * Stationsname als Ortslabel. Dekorativ, wirft nie: bei jedem Fehler kommt null
+ * zurueck. Bleibt bei der einen erlaubten API.
  * @param {{ lat: number, lon: number, fetchImpl?: typeof fetch }} args
- * @returns {Promise<string|null>}
+ * @returns {Promise<{temperature: number|null, stationName: string|null, timestamp: Date|null}|null>}
  */
-export async function fetchPlaceName({ lat, lon, fetchImpl }) {
+export async function fetchCurrentWeather({ lat, lon, fetchImpl }) {
   const doFetch = fetchImpl ?? globalThis.fetch;
-  const url = `${API_BASE}/sources?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`;
+  const url = `${API_BASE}/current_weather?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
     const res = await doFetch(url, {
       signal: controller.signal,
+      cache: "no-store",
       headers: { Accept: "application/json" },
     });
     if (!res.ok) return null;
-    const data = await res.json();
-    const sources = Array.isArray(data?.sources) ? data.sources : [];
-    let nearest = null;
-    for (const s of sources) {
-      const d = typeof s.distance === "number" ? s.distance : Infinity;
-      if (!nearest || d < nearest.distance) nearest = { distance: d, name: s.station_name };
-    }
-    return nearest && typeof nearest.name === "string" ? nearest.name : null;
+    return normalizeCurrent(await res.json());
   } catch {
     return null;
   } finally {
     clearTimeout(timer);
   }
+}
+
+/**
+ * Rohantwort von /current_weather -> {temperature, stationName, timestamp}.
+ * Exportiert fuer die Tests; wirft nicht, fehlende Felder werden zu null.
+ */
+export function normalizeCurrent(data) {
+  const w = data?.weather;
+  if (!w || typeof w !== "object") return null;
+
+  const temperature = typeof w.temperature === "number" ? w.temperature : null;
+
+  const ts = typeof w.timestamp === "string" ? new Date(w.timestamp) : null;
+  const timestamp = ts && !Number.isNaN(ts.getTime()) ? ts : null;
+
+  // Naechstgelegene Quelle liefert den Stationsnamen.
+  const sources = Array.isArray(data.sources) ? data.sources : [];
+  let nearest = null;
+  for (const s of sources) {
+    const d = typeof s.distance === "number" ? s.distance : Infinity;
+    if (!nearest || d < nearest.distance) nearest = { distance: d, name: s.station_name };
+  }
+  const stationName = nearest && typeof nearest.name === "string" ? nearest.name : null;
+
+  return { temperature, stationName, timestamp };
 }

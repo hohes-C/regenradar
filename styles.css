@@ -222,6 +222,22 @@ body[data-refreshing] .refresh-glyph {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Der Ortsname darf schrumpfen, die Temperatur nicht. */
+.place-line #place-name {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.temp {
+  flex: none;
+  font-weight: 700;
+  color: var(--text);
+}
+.temp::before {
+  content: "·";
+  margin-right: 6px;
+  font-weight: 400;
+  color: var(--faint);
+}
 /* Warnzellenname darf umbrechen statt abgeschnitten zu werden. Ohne min-width
    schrumpft das Flex-Kind nicht unter seine Textbreite und bliebe einzeilig. */
 .place-line-left span {

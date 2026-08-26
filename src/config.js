@@ -34,6 +34,10 @@ export const CLOCK_MS = 30000; // Intervall, in dem die Anzeige gegen die Uhr ne
 export const MIN_REFETCH_MS = 300000; // juengere Ergebnisse nicht neu laden
 export const FETCH_TIMEOUT_MS = 10000;
 
+// Aktuelle Messwerte. Aeltere Beobachtungen werden nicht mehr angezeigt: die
+// DWD-Stationen melden stuendlich, ein deutlich aelterer Wert waere irrefuehrend.
+export const CURRENT_MAX_AGE_MIN = 120;
+
 // Geolocation.
 export const GEO_MAX_AGE_MS = 300000; // maximumAge fuer Geolocation
 export const GEO_TIMEOUT_MS = 10000;

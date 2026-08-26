@@ -1,7 +1,7 @@
 // Bootstrap, Orte, Geolocation und Refresh-Logik. Einziger Ort mit
 // Date.now()/new Date() ohne Argument.
 
-import { fetchRadarSeries, fetchPlaceName, ApiError } from "./api.js";
+import { fetchRadarSeries, fetchCurrentWeather, ApiError } from "./api.js";
 import { computeNowcast } from "./nowcast.js";
 import { summarize } from "./text.js";
 import {
@@ -10,6 +10,7 @@ import {
   MIN_REFETCH_MS,
   REFRESH_MS,
   CLOCK_MS,
+  CURRENT_MAX_AGE_MIN,
   GEO_MAX_AGE_MS,
   GEO_TIMEOUT_MS,
 } from "./config.js";
@@ -44,6 +45,7 @@ const state = {
   alertsState: "loading",
   render: null, // { summary, nowcast } zuletzt gezeigt
   geoName: null, // { key, name } aufgeloester Standortname
+  current: null, // { temperature, timestamp } der naechsten DWD-Station
   currentState: "loading",
 };
 
@@ -101,6 +103,7 @@ function baseView(extra) {
     nowcast: state.render?.nowcast ?? null,
     coords: activeCoords(),
     fetchedAt: state.series?.fetchedAt ?? null,
+    temperature: currentTemperature(),
     placesOpen: state.placesOpen,
     ...extra,
   };
@@ -186,21 +189,29 @@ function getGeo({ fresh = false } = {}) {
   });
 }
 
-// Ortsname des automatischen Standorts nachladen (dekorativ). Aktualisiert das
-// Label, sobald der naechste DWD-Stationsname vorliegt.
-async function resolveGeoName(coords) {
+// Nur anzeigen, wenn die Beobachtung frisch genug ist. Die DWD-Stationen melden
+// stuendlich; ein deutlich aelterer Wert waere irrefuehrend.
+function currentTemperature() {
+  const c = state.current;
+  if (!c || c.temperature === null) return null;
+  if (c.timestamp && Date.now() - c.timestamp.getTime() > CURRENT_MAX_AGE_MIN * 60000) return null;
+  return c.temperature;
+}
+
+// Aktuelle Messwerte der naechsten DWD-Station nachladen: Temperatur fuer jeden
+// Ort, zusaetzlich der Stationsname als Label des automatischen Standorts.
+// Dekorativ, deshalb ohne eigenen Fehlerzustand.
+async function resolveCurrent(coords, id) {
   const key = `${round(coords.lat)},${round(coords.lon)}`;
-  if (state.geoName?.key === key) return;
-  try {
-    const name = await fetchPlaceName({ lat: round(coords.lat), lon: round(coords.lon) });
-    if (name) {
-      state.geoName = { key, name };
-      saveGeoName(state.geoName);
-      if (state.activeId === "geo") paint(baseView({ state: state.currentState }));
-    }
-  } catch {
-    /* Ortsname ist dekorativ, Fehler ignorieren */
+  const data = await fetchCurrentWeather({ lat: round(coords.lat), lon: round(coords.lon) });
+  if (!data || state.activeId !== id) return;
+
+  state.current = { temperature: data.temperature, timestamp: data.timestamp };
+  if (id === "geo" && data.stationName && state.geoName?.key !== key) {
+    state.geoName = { key, name: data.stationName };
+    saveGeoName(state.geoName);
   }
+  paint(baseView({ state: state.currentState }));
 }
 
 async function load(force = false) {
@@ -228,7 +239,7 @@ async function load(force = false) {
       coords = { lat: p.lat, lon: p.lon };
     }
 
-    if (id === "geo") resolveGeoName(coords);
+    resolveCurrent(coords, id);
     paint(baseView({ state: "loading" }));
     const now = new Date();
     const series = await fetchRadarSeries({ lat: round(coords.lat), lon: round(coords.lon), now });
@@ -258,6 +269,7 @@ function activate(id) {
   setActiveId(id);
   state.editing = false;
   state.placesOpen = false;
+  state.current = null;
   state.alerts = null;
   state.alertsState = "loading";
   paintAlerts();

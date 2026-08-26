@@ -1,7 +1,7 @@
 // Rendering und DOM-Aktualisierung. Kein Netz, keine Zeitlogik. Bekommt ein
 // fertiges View-Objekt und schreibt es in das Skelett aus index.html.
 
-import { fmtRate, hhmm, categoryLabel } from "./text.js";
+import { fmtRate, hhmm, categoryLabel, fmtTemp } from "./text.js";
 import { levelLabel } from "./alerts.js";
 import { HORIZON_MIN, FRAME_MIN, PAST_MIN, MMH_PER_UNIT, CONFIG } from "./config.js";
 import { categorize } from "./nowcast.js";
@@ -617,6 +617,7 @@ function renderHeroIcon(kind) {
  *   activePlaceId?: string,
  *   editing?: boolean,
  *   placesOpen?: boolean,
+ *   temperature?: number|null,
  *   fetchedAt?: Date|null,
  * }} view
  */
@@ -624,6 +625,9 @@ export function render(view) {
   document.body.dataset.state = view.state;
 
   el("place-name").textContent = view.place?.name ?? "Aktueller Standort";
+  const temp = el("temp");
+  temp.hidden = typeof view.temperature !== "number";
+  temp.textContent = temp.hidden ? "" : fmtTemp(view.temperature);
 
   const summary = view.summary;
   el("title").textContent = summary?.title ?? (view.state === "loading" ? "Wird geladen" : "");
