@@ -114,6 +114,7 @@ export function renderDebug(stateName) {
       nowcast,
       coords: series.coords,
       fetchedAt: series.fetchedAt,
+      temperature: 15.4,
       ...extra,
     }));
   };

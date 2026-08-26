@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
-import { fetchRadarSeries, ApiError } from "../src/api.js";
+import { fetchRadarSeries, ApiError, normalizeCurrent } from "../src/api.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const raw = JSON.parse(readFileSync(join(here, "fixtures", "raw-sample.json"), "utf8"));
@@ -132,4 +132,30 @@ test("Fehler: shape (ungueltiges JSON)", async () => {
     fetchRadarSeries({ ...COORDS, now: NOW, fetchImpl: mockFetch({ body: "{nicht json" }) }),
     (e) => e instanceof ApiError && e.kind === "shape"
   );
+});
+
+test("current_weather: Temperatur, Stationsname und Zeitstempel", () => {
+  const out = normalizeCurrent({
+    weather: { timestamp: "2026-08-26T06:30:00+00:00", temperature: 15.4, condition: "dry" },
+    sources: [
+      { distance: 12000, station_name: "Weit weg" },
+      { distance: 900, station_name: "Nürnberg" },
+    ],
+  });
+  assert.equal(out.temperature, 15.4);
+  assert.equal(out.stationName, "Nürnberg");
+  assert.equal(out.timestamp.toISOString(), "2026-08-26T06:30:00.000Z");
+});
+
+test("current_weather: fehlende Felder werden zu null, nichts wirft", () => {
+  assert.equal(normalizeCurrent({}), null);
+  assert.equal(normalizeCurrent(null), null);
+
+  const leer = normalizeCurrent({ weather: { timestamp: "kaputt", temperature: null } });
+  assert.equal(leer.temperature, null);
+  assert.equal(leer.stationName, null);
+  assert.equal(leer.timestamp, null);
+
+  // temperature 0 ist ein gueltiger Wert und darf nicht als fehlend gelten
+  assert.equal(normalizeCurrent({ weather: { temperature: 0 } }).temperature, 0);
 });

@@ -26,7 +26,7 @@ manifest.webmanifest  PWA-Manifest
 sw.js                 Service Worker (Root, Scope "./")
 src/
   config.js           alle Konstanten und Schwellen
-  api.js              Bright Sky /radar -> RadarSeries (einziges Modul mit API-Wissen)
+  api.js              Bright Sky /radar und /current_weather (einziges Modul mit API-Wissen)
   alerts.js           Bright Sky /alerts -> gruppierte DWD-Warnungen
   nowcast.js          RadarSeries -> Nowcast (rein, ohne DOM, ohne Date.now())
   text.js             Nowcast -> deutsche Sätze (rein)
@@ -98,13 +98,17 @@ Ausgenommen sind die Fußzeile im Warnungen-Reiter und die Eingabefelder.
 Unten liegt die Reiterleiste. Am Reiter *Warnungen* zeigt ein Zähler die Anzahl
 der aktiven Warnungen.
 
-Im Regen-Reiter scrollen Hero, Vorhersage- und Radar-Karte gemeinsam. Die
-Kartengröße folgt daraus, dass Zeitleiste und Karte zusammen ins Bild passen
-müssen: das Wischen über die Leiste zeigt den jeweiligen Frame auf der Karte,
-und daran liest man den Zug des Regens ab. Nach unten ist die Karte deshalb auf
-ein etwa quadratisches Format begrenzt (`min(78vw, 380px)`), nach oben auf die
-Fensterhöhe abzüglich Kopfzeile, Reiterleiste und Vorhersage-Karte; auf hohen
-Fenstern wächst sie in den freien Platz.
+Im Regen-Reiter scrollen Hero, Vorhersage- und Radar-Karte gemeinsam, auf
+üblichen Telefonen ist aber alles ohne Scrollen im Bild. Dafür ist der Hero eine
+flache Zeile: Wettersymbol, Kurzfassung und darunter klein der Ort mit der
+aktuellen Temperatur.
+
+Die Kartengröße folgt daraus, dass Zeitleiste und Karte zusammen sichtbar
+bleiben müssen: das Wischen über die Leiste zeigt den jeweiligen Frame auf der
+Karte, und daran liest man den Zug des Regens ab. Nach unten ist die Karte auf
+ein etwa quadratisches Format begrenzt (`min(78vw, 340px)`), nach oben auf die
+Fensterhöhe abzüglich Kopfzeile, Hero, Vorhersage-Karte und Reiterleiste; auf
+hohen Fenstern wächst sie in den freien Platz.
 
 Das DWD-Raster wird formatfüllend gezeichnet und am Standort ausgerichtet, der
 dadurch immer exakt in der Kartenmitte sitzt. Die Orts-Auswahl und das Formular
@@ -156,6 +160,7 @@ im Code.
 | `CLOCK_MS` | 30000 | Intervall, in dem die Anzeige gegen die Uhr neu gerechnet wird |
 | `MIN_REFETCH_MS` | 300000 | jüngere Ergebnisse werden nicht neu geladen |
 | `FETCH_TIMEOUT_MS` | 10000 | Timeout einer Anfrage |
+| `CURRENT_MAX_AGE_MIN` | 120 | ältere Beobachtungen werden nicht mehr angezeigt |
 | `GEO_MAX_AGE_MS` | 300000 | maximumAge für Geolocation (beim manuellen Aktualisieren 0) |
 | `GEO_TIMEOUT_MS` | 10000 | Timeout für Geolocation |
 | `COORD_DECIMALS` | 3 | Rundung der Koordinaten vor der Anfrage |
@@ -205,6 +210,18 @@ Hosting deployen oder den lokalen Server über einen HTTPS-Tunnel verfügbar mac
 (Tailscale Serve oder cloudflared). Danach in Safari über "Zum Home-Bildschirm"
 installieren; die App startet im Vollbild.
 
+## Temperatur
+
+`/current_weather?lat=&lon=` liefert die aktuellen Messwerte der nächstgelegenen
+DWD-Station. Genutzt werden die Temperatur (auf ganze Grad gerundet, neben dem
+Ort) und der Stationsname als Label des automatischen Standorts. Der Aufruf
+ersetzt den früheren auf `/sources`, die Zahl der Anfragen bleibt also gleich.
+
+Der Wert ist dekorativ: `fetchCurrentWeather` wirft nie, bei jedem Fehler kommt
+`null` zurück und die Temperatur wird schlicht nicht angezeigt. Beobachtungen,
+die älter als `CURRENT_MAX_AGE_MIN` sind, werden ebenfalls nicht angezeigt: die
+Stationen melden stündlich, ein deutlich älterer Wert wäre irreführend.
+
 ## Warnungen
 
 `/alerts?lat=&lon=` liefert die amtlichen DWD-Warnungen (CAP) für die Warnzelle
@@ -240,8 +257,9 @@ keine Anfragen, solange die App nicht sichtbar ist (beides in `main.js`
 umgesetzt).
 
 Der Ortsname des automatischen Standorts kommt aus dem Bright-Sky-Endpoint
-`/sources` (nächstgelegene DWD-Station, z. B. "Berlin-Alexanderplatz"). Selbst
-angelegte Orte behalten den eingegebenen Namen.
+`/current_weather` (nächstgelegene DWD-Station, z. B. "Berlin-Alexanderplatz"),
+zusammen mit der Temperatur. Selbst angelegte Orte behalten den eingegebenen
+Namen, bekommen die Temperatur aber genauso.
 
 ### Kartenhintergrund
 

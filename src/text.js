@@ -32,6 +32,12 @@ export function fmtRate(mmh) {
   }).format(mmh);
 }
 
+/** Temperatur als ganze Grad, z. B. "15°". Minus null wird zu null. */
+export function fmtTemp(celsius) {
+  const r = Math.round(celsius);
+  return `${Object.is(r, -0) ? 0 : r}°`;
+}
+
 /** Grundform des Kategorie-Worts fuer die UI. */
 export function categoryLabel(category) {
   return WORD[category] ?? "";

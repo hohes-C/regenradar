@@ -159,38 +159,36 @@ body[data-refreshing] .refresh-glyph {
   }
 }
 
-/* Hero: Symbol, Kurzfassung, Ort */
+/* Hero: Symbol, Kurzfassung und Ort in einer Zeile. Bewusst flach gehalten,
+   damit Zeitleiste und Karte darunter zusammen ins Bild passen, ohne dass
+   gescrollt werden muss. */
 .hero {
   flex: none;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  text-align: center;
-  gap: clamp(4px, 1.2vh, 12px);
-  padding: clamp(4px, 1.6vh, 16px) 0 clamp(8px, 1.6vh, 16px);
+  gap: 12px;
+  padding: 4px 2px 2px;
 }
 .hero-icon {
-  width: clamp(56px, 11vh, 92px);
-  height: clamp(56px, 11vh, 92px);
+  flex: none;
+  width: clamp(44px, 12vw, 54px);
+  height: clamp(44px, 12vw, 54px);
   border-radius: 50%;
   background: rgba(24, 18, 40, 0.55);
   display: grid;
   place-items: center;
 }
 .hero-icon svg {
-  width: 62%;
-  height: 62%;
+  width: 64%;
+  height: 64%;
 }
-.title-box {
-  display: grid;
-  place-items: center;
-  min-height: 2.24em; /* zwei Zeilen reserviert, kein Layout-Sprung */
-  font-size: clamp(26px, 8vw, 40px);
-  width: 100%;
+.hero-text {
+  flex: 1;
+  min-width: 0;
 }
 .title {
-  font-size: inherit;
-  line-height: 1.12;
+  font-size: clamp(19px, 5.4vw, 25px);
+  line-height: 1.15;
   font-weight: 800;
   letter-spacing: -0.015em;
   margin: 0;
@@ -202,10 +200,9 @@ body[data-refreshing] .refresh-glyph {
 .place-line {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
-  margin: 0;
-  font-size: 16px;
+  gap: 6px;
+  margin: 1px 0 0;
+  font-size: 14px;
   color: var(--muted);
   min-width: 0;
 }
@@ -225,6 +222,22 @@ body[data-refreshing] .refresh-glyph {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Der Ortsname darf schrumpfen, die Temperatur nicht. */
+.place-line #place-name {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.temp {
+  flex: none;
+  font-weight: 700;
+  color: var(--text);
+}
+.temp::before {
+  content: "·";
+  margin-right: 6px;
+  font-weight: 400;
+  color: var(--faint);
+}
 /* Warnzellenname darf umbrechen statt abgeschnitten zu werden. Ohne min-width
    schrumpft das Flex-Kind nicht unter seine Textbreite und bliebe einzeilig. */
 .place-line-left span {
@@ -236,6 +249,11 @@ body[data-refreshing] .refresh-glyph {
 }
 .place-arrow {
   flex: none;
+  width: 14px;
+  height: 14px;
+  color: var(--faint);
+}
+.place-line-left .place-arrow {
   width: 17px;
   height: 17px;
   color: var(--text);
@@ -469,7 +487,11 @@ body[data-refreshing] .refresh-glyph {
 }
 .card-radar .radar-canvas-wrap {
   flex: 1;
-  min-height: max(190px, min(78vw, 380px, 100dvh - 364px));
+  /* Untergrenze etwa quadratisch, nach oben durch die Fensterhoehe begrenzt.
+     Die 445px sind Kopfzeile, Hero, Vorhersage-Karte, Legende, Reiterleiste
+     und Abstaende: so bleibt auf ueblichen Telefonen alles ohne Scrollen im
+     Bild, auf sehr niedrigen wird gescrollt statt abgeschnitten. */
+  min-height: max(180px, min(78vw, 340px, 100dvh - 445px));
 }
 .radar-canvas-wrap {
   position: relative;

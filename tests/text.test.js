@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { computeNowcast } from "../src/nowcast.js";
-import { summarize, hhmm, fmtRate } from "../src/text.js";
+import { summarize, hhmm, fmtRate, fmtTemp } from "../src/text.js";
 import { CONFIG } from "../src/config.js";
 import { buildSeries, at, BASE_NOW } from "./helpers.js";
 
@@ -158,4 +158,13 @@ test("status fuer alle drei freshness-Werte", () => {
 test("status ageUncertain haengt (geschätzt) an", () => {
   const out = nc(new Array(25).fill(0), { runTimeNull: true });
   assert.equal(summarize(out).status, `Stand ${hhmm(now)} (geschätzt)`);
+});
+
+test("Temperatur als ganze Grad", () => {
+  assert.equal(fmtTemp(15.4), "15°");
+  assert.equal(fmtTemp(0.5), "1°");
+  assert.equal(fmtTemp(-3.6), "-4°");
+  assert.equal(fmtTemp(22), "22°");
+  // Math.round(-0.4) ist -0; das darf nicht als "-0°" erscheinen
+  assert.equal(fmtTemp(-0.4), "0°");
 });
