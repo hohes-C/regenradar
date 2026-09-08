@@ -93,10 +93,11 @@ function buildTitle(nowcast) {
   const { coverage, events, isolatedFrames, current } = nowcast;
   if (coverage === "none") return "Keine Radardaten";
   if (events.length === 0) {
-    return isolatedFrames.length > 0 ? "Vereinzelt Tropfen" : "Kein Regen";
+    return isolatedFrames.length > 0 ? "Kurzer Regen möglich" : coverage === "partial" ? "Vorhersage unvollständig" : "Kein Regen";
   }
   const e = events[0];
   if (e.startsNow) return `${cap(ADJ[current.category])} Regen jetzt`;
+  if (coverage === "partial") return "Regen möglich, Datenlücken";
   if (e.uncertain) return `Vielleicht Regen um ${hhmm(e.start)}`;
   const adj = ADJ[e.peakCategory];
   if (minutesUntil(e.start, nowcast.now) < 3) return `Gleich ${adj} Regen`;
@@ -130,11 +131,24 @@ export function summarize(nowcast) {
     return { title, icon, headline, detail: null, status };
   }
 
+  if (coverage === "partial") {
+    const e = events[0];
+    if (e?.startsNow) {
+      headline = `Es regnet gerade, ${WORD[current.category]} (${fmtRate(current.rateMmh)} mm/h). Die weitere Vorhersage ist unvollständig.`;
+    } else if (e) {
+      headline = `In den verfügbaren Daten: ${ADJ[e.peakCategory]} Regen gegen ${hhmm(e.start)}. Beginn und Dauer sind wegen Datenlücken unsicher.`;
+    } else if (isolatedFrames.length) {
+      headline = "Einzelne Regenintervalle in den verfügbaren Daten. Die Vorhersage ist unvollständig.";
+    } else {
+      headline = "In den verfügbaren Daten kein Regen. Für die nächsten 2 Stunden fehlen jedoch Daten.";
+    }
+    return { title, icon, headline, detail: null, status };
+  }
+
   if (events.length === 0) {
     if (isolatedFrames.length > 0) {
-      headline = `Weitgehend trocken, vereinzelt Tropfen möglich gegen ${hhmm(
-        isolatedFrames[0].validTime
-      )}.`;
+      const f = isolatedFrames[0];
+      headline = `Kurzer ${ADJ[f.category]} Regen (${fmtRate(f.rateMmh)} mm/h) möglich gegen ${hhmm(f.validTime)}.`;
     } else {
       headline = "Kein Regen in den nächsten 2 Stunden.";
     }
@@ -176,3 +190,4 @@ export function summarize(nowcast) {
   }
   return { title, icon, headline, detail: buildDetail(nowcast), status };
 }
+

@@ -1,7 +1,7 @@
 // Service Worker. App-Shell cache-first, Bright Sky strikt network-only.
 // Bei jeder Aenderung an der Shell CACHE_VERSION erhoehen.
 
-const CACHE_VERSION = "regenradar-v14";
+const CACHE_VERSION = "regenradar-v15";
 
 const SHELL = [
   "./",
@@ -78,3 +78,4 @@ self.addEventListener("fetch", (event) => {
     })
   );
 });
+
