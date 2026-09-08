@@ -38,14 +38,14 @@ test("kein Regen", () => {
   assert.equal(summarize(out).headline, "Kein Regen in den nächsten 2 Stunden.");
 });
 
-test("isolierte Frames: vereinzelt Tropfen", () => {
+test("isolierte Frames: tatsaechliche Intensitaet", () => {
   const values = new Array(25).fill(0);
   values[1] = R;
   const out = nc(values);
   const iso = out.isolatedFrames[0].validTime;
   assert.equal(
     summarize(out).headline,
-    `Weitgehend trocken, vereinzelt Tropfen möglich gegen ${hhmm(iso)}.`
+    `Kurzer mäßiger Regen (6,0 mm/h) möglich gegen ${hhmm(iso)}.`
   );
 });
 
@@ -168,3 +168,4 @@ test("Temperatur als ganze Grad", () => {
   // Math.round(-0.4) ist -0; das darf nicht als "-0°" erscheinen
   assert.equal(fmtTemp(-0.4), "0°");
 });
+

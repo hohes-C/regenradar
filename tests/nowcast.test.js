@@ -79,13 +79,13 @@ test("trockener Frame in Regenphase wird ueberbrueckt", () => {
   assert.deepEqual(out.events[0].end, at(25)); // frame5.vt
 });
 
-test("Regen nur im Zentrum, Nachbarn trocken: Intensitaet mindestens light", () => {
+test("Intensiver Regen im Zentrum bleibt trotz trockener Nachbarn erhalten", () => {
   const values = new Array(25).fill(0);
   values[1] = 500; // waere uniform "extreme", aber Nachbarn 0
   values[2] = 500;
   const out = nc(values, { neighbors: "zero" });
   assert.equal(out.events.length, 1);
-  assert.equal(out.events[0].peakCategory, "light");
+  assert.equal(out.events[0].peakCategory, "extreme");
   assert.equal(out.forecast[0].isRain, true);
 });
 
@@ -171,3 +171,4 @@ test("Fenster m10/m20/m120 beruecksichtigen leadMin-Grenzen", () => {
   assert.ok(out.windows.m120.maxMmh > 0);
   assert.deepEqual(out.windows.m120.firstRainAt, at(35)); // frame8.vt - 5
 });
+

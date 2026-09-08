@@ -123,8 +123,23 @@ Radardaten und Warnungen am HTTP-Cache vorbei (`cache: "no-store"`) und eine
 Neuberechnung der Anzeige gegen die aktuelle Uhr. Der Ring dreht sich, solange
 das läuft.
 
-Radar und Warnungen werden getrennt geladen: ein Fehler in der einen Abfrage
-lässt die andere Ansicht stehen.
+Radar, Warnungen und Stationsdaten starten unabhängig voneinander nach der
+Standortermittlung und verwenden dieselben Koordinaten. Der Aktualisieren-Knopf
+wartet auf alle drei Abrufe. Ein Ortswechsel entwertet sämtliche Antworten der
+vorherigen Aktivierung, auch beim schnellen Wechsel A → B → A. Alte Radarflächen
+werden beim Wechsel auf einen Ort ohne Cache geleert.
+
+Schlägt ein Warnungsabruf fehl, bleiben vorhandene Meldungen mit einem deutlichen
+Hinweis auf den möglicherweise veralteten Stand lesbar. Eine zuvor leere Liste
+wird dann als „Warnstatus unbekannt“ angezeigt, nicht als Entwarnung.
+
+Fehlende Radarintervalle erscheinen als Datenlücken in der Zeitleiste. Aussagen
+über zwei Stunden Trockenheit setzen ein vollständiges Vorhersagefenster voraus.
+Regenereignisse werden nicht über unbekannte Intervalle verbunden. Aktueller
+Regen sowie einzelne intensive Frames oberhalb von `MODERATE_MAX_MMH` bleiben
+auch bei kurzer Dauer erhalten. Die Intensität berücksichtigt mindestens den
+Wert der Standortzelle und wird durch trockene Nachbarn nicht herabgesetzt.
+Andere isolierte Regenframes werden mit ihrer tatsächlichen Intensität benannt.
 
 Unabhängig davon rechnet die App die Anzeige alle `CLOCK_MS` gegen die Uhr neu
 und ebenso, sobald sie wieder sichtbar wird. Ohne das hingen "jetzt", die
@@ -273,3 +288,4 @@ Radar funktioniert weiter. Der metrische Maßstab unten links ist rasterbasiert
 und bleibt exakt (1 Zelle = 1 km), unabhängig vom Kartenhintergrund.
 
 Datenbasis: Deutscher Wetterdienst, via Bright Sky.
+

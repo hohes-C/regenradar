@@ -31,6 +31,8 @@ import {
 const round = (n) => Number(n.toFixed(COORD_DECIMALS));
 
 const state = {
+  generation: 0, // jede Ortsaktivierung entwertet laufende Antworten
+  coords: null, // tatsaechlich ermittelter Standort dieser Aktivierung
   places: [],
   activeId: "geo",
   editing: false,
@@ -41,6 +43,8 @@ const state = {
   tab: "rain", // sichtbarer Reiter: rain | alerts
   placesOpen: false,
   alerts: null, // zuletzt geladene Warnungen des aktiven Ortes
+  alertRequest: 0,
+  alertCoords: null,
   alertsLoading: false,
   alertsState: "loading",
   render: null, // { summary, nowcast } zuletzt gezeigt
@@ -63,16 +67,11 @@ function placeName(id) {
 }
 
 // Kartenanker unabhaengig von den (evtl. gecachten) Radardaten. Fuer gespeicherte
-// Orte synchron bekannt; fuer "geo" aus dem gemerkten Standort-Key (gerundet).
+// Orte synchron bekannt; fuer "geo" aus der aktuellen Standortbestimmung.
 // Faellt auf die coords der aktuellen RadarSeries zurueck.
 function activeCoords() {
-  if (state.activeId === "geo") {
-    const key = state.geoName?.key;
-    if (typeof key === "string") {
-      const [lat, lon] = key.split(",").map(Number);
-      if (Number.isFinite(lat) && Number.isFinite(lon)) return { lat, lon };
-    }
-  } else {
+  if (state.coords) return state.coords;
+  if (state.activeId !== "geo") {
     const p = state.places.find((x) => x.id === state.activeId);
     if (p) return { lat: p.lat, lon: p.lon };
   }
@@ -129,15 +128,17 @@ function paintAlerts(extra = {}) {
 
 // Amtliche DWD-Warnungen des aktiven Ortes. Eigener Abruf, unabhaengig vom
 // Radar: ein Fehler hier darf die Regenansicht nicht stoeren und umgekehrt.
-async function loadAlerts(force = false) {
-  if (state.alertsLoading) return;
-  const id = state.activeId;
-  const fresh = state.alerts && Date.now() - state.alerts.fetchedAt.getTime() < MIN_REFETCH_MS;
+async function loadAlerts(force = false, coords = activeCoords()) {
+  if (!coords) return;
+  const key = `${round(coords.lat)},${round(coords.lon)}`;
+  if (state.alertsLoading && !force && state.alertCoords === key) return;
+  const generation = state.generation;
+  const fresh = state.alertCoords === key && state.alerts && Date.now() - state.alerts.fetchedAt.getTime() < MIN_REFETCH_MS;
   if (!force && fresh) return;
 
-  const coords = activeCoords();
-  if (!coords) return; // ohne Ort kein Abruf, kommt mit dem naechsten Radar-Lauf
-
+  const request = ++state.alertRequest;
+  const isCurrent = () => state.generation === generation && state.alertRequest === request;
+  state.alertCoords = key;
   state.alertsLoading = true;
   if (!state.alerts) {
     state.alertsState = "loading";
@@ -145,18 +146,18 @@ async function loadAlerts(force = false) {
   }
   try {
     const data = await fetchAlerts({ lat: round(coords.lat), lon: round(coords.lon), now: new Date() });
-    if (state.activeId !== id) return; // Ort wurde zwischenzeitlich gewechselt
+    if (!isCurrent()) return; // Antwort gehoert zu alter Aktivierung oder Anfrage
     state.alerts = data;
     state.alertsState = "ok";
     paintAlerts();
   } catch (err) {
-    if (state.activeId !== id) return;
+    if (!isCurrent()) return;
     const offline = typeof navigator !== "undefined" && navigator.onLine === false;
     const kind = err instanceof ApiError ? err.kind : "network";
     state.alertsState = offline ? "offline" : "error";
     paintAlerts({ error: { kind } });
   } finally {
-    state.alertsLoading = false;
+    if (isCurrent()) state.alertsLoading = false;
   }
 }
 
@@ -201,10 +202,10 @@ function currentTemperature() {
 // Aktuelle Messwerte der naechsten DWD-Station nachladen: Temperatur fuer jeden
 // Ort, zusaetzlich der Stationsname als Label des automatischen Standorts.
 // Dekorativ, deshalb ohne eigenen Fehlerzustand.
-async function resolveCurrent(coords, id) {
+async function resolveCurrent(coords, id, generation) {
   const key = `${round(coords.lat)},${round(coords.lon)}`;
   const data = await fetchCurrentWeather({ lat: round(coords.lat), lon: round(coords.lon) });
-  if (!data || state.activeId !== id) return;
+  if (!data || state.generation !== generation) return;
 
   state.current = { temperature: data.temperature, timestamp: data.timestamp };
   if (id === "geo" && data.stationName && state.geoName?.key !== key) {
@@ -217,10 +218,13 @@ async function resolveCurrent(coords, id) {
 async function load(force = false) {
   if (state.loading) return;
   const id = state.activeId;
-
+  const generation = state.generation;
+  const isCurrent = () => state.generation === generation;
   const cached = loadLast(id);
   if (!force && cached && Date.now() - cached.fetchedAt.getTime() < MIN_REFETCH_MS) {
-    return; // frisch genug, kein Netz
+    // Frisches Radar darf den unabhaengigen Warnungsabruf nicht verhindern.
+    await loadAlerts(false);
+    return;
   }
 
   state.loading = true;
@@ -230,7 +234,7 @@ async function load(force = false) {
       try {
         coords = await getGeo({ fresh: force });
       } catch {
-        handleNoGeo();
+        if (isCurrent()) handleNoGeo();
         return;
       }
     } else {
@@ -238,20 +242,40 @@ async function load(force = false) {
       if (!p) return;
       coords = { lat: p.lat, lon: p.lon };
     }
-
-    resolveCurrent(coords, id);
+    if (!isCurrent()) return;
+    const previous = activeCoords();
+    state.coords = coords;
+    if (previous && (round(previous.lat) !== round(coords.lat) || round(previous.lon) !== round(coords.lon))) {
+      state.series = null;
+      state.render = null;
+      state.current = null;
+      state.alerts = null;
+      state.alertsState = "loading";
+      paintAlerts();
+    }
     paint(baseView({ state: "loading" }));
-    const now = new Date();
-    const series = await fetchRadarSeries({ lat: round(coords.lat), lon: round(coords.lon), now });
-    saveLast(id, series);
-    renderResult(series, now);
-    loadAlerts(force);
-  } catch (err) {
-    const offline = typeof navigator !== "undefined" && navigator.onLine === false;
-    const kind = err instanceof ApiError ? err.kind : "network";
-    paint(baseView({ state: offline ? "offline" : "error", error: { kind } }));
+
+    // Alle Dienste verwenden dieselben frisch ermittelten Koordinaten.
+    // Fehler des Radars blockieren weder Warnungen noch Stationsdaten.
+    const weather = resolveCurrent(coords, id, generation);
+    const alerts = loadAlerts(force, coords);
+    const radar = (async () => {
+      try {
+        const now = new Date();
+        const series = await fetchRadarSeries({ lat: round(coords.lat), lon: round(coords.lon), now });
+        if (!isCurrent()) return;
+        saveLast(id, series);
+        renderResult(series, new Date());
+      } catch (err) {
+        if (!isCurrent()) return;
+        const offline = typeof navigator !== "undefined" && navigator.onLine === false;
+        const kind = err instanceof ApiError ? err.kind : "network";
+        paint(baseView({ state: offline ? "offline" : "error", error: { kind } }));
+      }
+    })();
+    await Promise.allSettled([radar, alerts, weather]);
   } finally {
-    state.loading = false;
+    if (isCurrent()) state.loading = false;
   }
 }
 
@@ -260,11 +284,19 @@ function handleNoGeo() {
   const fallback = state.places[0];
   if (fallback) {
     // Nach Zuruecksetzen des loading-Flags auf gespeicherten Ort wechseln.
-    setTimeout(() => activate(fallback.id), 0);
+    const generation = state.generation;
+    setTimeout(() => { if (state.generation === generation) activate(fallback.id); }, 0);
   }
 }
 
 function activate(id) {
+  state.generation += 1;
+  state.alertRequest += 1;
+  state.alertCoords = null;
+  state.loading = false;
+  state.alertsLoading = false;
+  state.coords = null;
+  delete document.body.dataset.refreshing;
   state.activeId = id;
   setActiveId(id);
   state.editing = false;
@@ -299,7 +331,6 @@ function startPolling() {
   if (!state.timer) {
     state.timer = setInterval(() => {
       load(false);
-      loadAlerts(false);
     }, REFRESH_MS);
   }
   if (!state.clock) state.clock = setInterval(retick, CLOCK_MS);
@@ -335,11 +366,12 @@ function onAddSubmit({ name, lat, lon, useGeo }) {
 // neu gezeichnet wird.
 async function refreshAll() {
   if (state.loading) return;
+  const generation = state.generation;
   document.body.dataset.refreshing = "1";
   try {
-    await Promise.all([load(true), loadAlerts(true)]);
+    await load(true);
   } finally {
-    delete document.body.dataset.refreshing;
+    if (state.generation === generation) delete document.body.dataset.refreshing;
   }
 }
 
@@ -349,7 +381,6 @@ function wireEvents() {
   document.getElementById("retry").addEventListener("click", refreshAll);
   window.addEventListener("online", () => {
     load(false);
-    loadAlerts(false);
   });
 
   for (const btn of document.querySelectorAll(".tab")) {
@@ -400,7 +431,6 @@ function wireEvents() {
       startPolling();
       retick(); // sofort auf die aktuelle Uhrzeit, auch ohne neue Daten
       load(false);
-      loadAlerts(false);
     } else {
       stopPolling();
     }
@@ -440,3 +470,4 @@ async function boot() {
 }
 
 boot();
+

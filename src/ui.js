@@ -452,7 +452,7 @@ function renderRadar(frame, isNow) {
   drawRadar(canvas, frame.grid, viewNowcast.center);
   renderMapBackground(frame.grid);
   const badge = el("radar-time");
-  if (badge) badge.textContent = isNow ? "jetzt" : hhmm(frame.validTime);
+  if (badge) badge.textContent = frame.noData ? `${hhmm(frame.validTime)} · keine Daten` : isNow ? "jetzt" : hhmm(frame.validTime);
   ensureRadarObserver(canvas);
 }
 
@@ -655,6 +655,21 @@ export function render(view) {
     renderTimeline(view.nowcast);
     renderLegend();
     renderRadarCurrent();
+  } else {
+    // Beim Ortswechsel darf kein Radarbild des vorherigen Ortes stehenbleiben.
+    viewNowcast = null;
+    radarFrame = null;
+    mapKey = null;
+    mapToken += 1;
+    hideScrub();
+    ticksObserver?.disconnect();
+    ticksState = null;
+    el("timeline").replaceChildren();
+    el("ticks").replaceChildren();
+    for (const id of ["radar", "radar-bg"]) {
+      const canvas = el(id);
+      if (canvas) canvas.width = canvas.width;
+    }
   }
 
   if (view.places) renderPlaces(view.places, view.activePlaceId, view.editing);
@@ -815,8 +830,19 @@ export function renderAlerts(view) {
   const data = view.alerts;
   if (!data) return;
 
+  const outdated = ["error", "offline"].includes(view.state);
+  if (outdated) {
+    const warning = document.createElement("p");
+    warning.className = "alerts-foot";
+    warning.setAttribute("role", "alert");
+    warning.textContent = "Aktualisierung fehlgeschlagen. Die angezeigten Warnungsdaten sind möglicherweise veraltet, der aktuelle Warnstatus ist unbekannt.";
+    box.append(warning);
+  }
+
   if (data.groups.length === 0) {
-    box.append(emptyCard("i-check", "Entwarnung", "keine amtlichen Warnungen"));
+    box.append(outdated
+      ? emptyCard("i-warn", "Warnstatus unbekannt", "Beim letzten erfolgreichen Abruf lagen keine Warnungen vor.")
+      : emptyCard("i-check", "Entwarnung", "keine amtlichen Warnungen"));
   } else {
     for (const g of data.groups) box.append(alertCard(g));
   }
@@ -830,3 +856,4 @@ export function renderAlerts(view) {
 }
 
 export { renderPlaces };
+

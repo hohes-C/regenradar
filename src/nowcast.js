@@ -73,6 +73,9 @@ function computeFrame(frame, now, center, c) {
   if (!isRain) rateMmh = medianMmh;
   else if (medianMmh < c.RAIN_MIN_MMH) rateMmh = c.RAIN_MIN_MMH; // mindestens "leicht"
   else rateMmh = medianMmh;
+  // Ein intensiver Treffer direkt am Standort darf nicht im Median verschwinden.
+  const centerUnit = frame.grid?.[center.row]?.[center.col];
+  if (typeof centerUnit === "number") rateMmh = Math.max(rateMmh, centerUnit * c.MMH_PER_UNIT);
 
   return {
     validTime: frame.validTime,
@@ -104,14 +107,21 @@ function buildEvents(seq, hasCurrent, c) {
   const clusters = [];
   for (const idx of rainIdx) {
     const last = clusters.at(-1);
-    if (last && idx - last.at(-1) <= c.MAX_GAP_FRAMES + 1) last.push(idx);
+    const previous = last?.at(-1);
+    const gap = previous === undefined ? [] : seq.slice(previous + 1, idx);
+    const elapsed = previous === undefined ? Infinity :
+      seq[idx].validTime - seq[previous].validTime;
+    if (last && elapsed <= (c.MAX_GAP_FRAMES + 1) * c.FRAME_MIN * MIN &&
+        gap.every((f) => !f.noData && !f.hadNull)) last.push(idx);
     else clusters.push([idx]);
   }
 
   const events = [];
   const isolatedFrames = [];
   for (const cluster of clusters) {
-    if (cluster.length < c.MIN_EVENT_FRAMES) {
+    const currentRain = hasCurrent && cluster[0] === 0;
+    const intense = cluster.some((i) => seq[i].rateMmh > c.MODERATE_MAX_MMH);
+    if (cluster.length < c.MIN_EVENT_FRAMES && !currentRain && !intense) {
       for (const i of cluster) {
         seq[i].isolated = true;
         isolatedFrames.push(seq[i]);
@@ -133,7 +143,7 @@ function buildEvents(seq, hasCurrent, c) {
       start,
       end,
       startsNow: hasCurrent && first === 0,
-      openEnded: lastRain === seq.length - 1,
+      openEnded: lastRain === seq.length - 1 || seq[lastRain + 1].noData || seq[lastRain + 1].hadNull,
       durationMin: Math.round((end.getTime() - start.getTime()) / MIN),
       peakMmh: peak.rateMmh,
       peakTime: peak.validTime,
@@ -176,10 +186,22 @@ export function computeNowcast(series, now, config) {
 
   const atOrBefore = computed.filter((f) => f.validTime.getTime() <= now.getTime());
   const after = computed.filter((f) => f.validTime.getTime() > now.getTime());
-  const current = atOrBefore.length ? atOrBefore[atOrBefore.length - 1] : null;
+  const latest = atOrBefore.at(-1);
+  const current = latest && now - latest.validTime < c.FRAME_MIN * MIN ? latest : null;
   const past = atOrBefore.length ? atOrBefore.slice(0, -1) : [];
-  const maxForecast = Math.round(c.HORIZON_MIN / c.FRAME_MIN);
-  const forecast = after.slice(0, maxForecast);
+  // Explizite Zeitslots: fehlende Frames bleiben sichtbar und stauchen die
+  // Zeitleiste nicht. Auch ein verkuerzter API-Horizont ist eine Datenluecke.
+  const step = c.FRAME_MIN * MIN;
+  const anchor = sorted[0]?.validTime.getTime() ?? now.getTime();
+  const first = anchor + (Math.floor((now.getTime() - anchor) / step) + 1) * step;
+  const byTime = new Map(after.map((f) => [f.validTime.getTime(), f]));
+  const forecast = [];
+  const emptyGrid = sorted[0]?.grid.map(row => row.map(() => null)) ?? [[null]];
+  for (let t = first; t - step < now.getTime() + c.HORIZON_MIN * MIN; t += step) {
+    forecast.push(byTime.get(t) ?? computeFrame({
+      validTime: new Date(t), grid: emptyGrid, isForecast: true,
+    }, now, center, c));
+  }
 
   // Datenalter.
   let ageMin = null;
@@ -202,7 +224,7 @@ export function computeNowcast(series, now, config) {
   const hadNull = shown.some((f) => f.hadNull);
   let coverage = "ok";
   if (shown.length === 0 || noDataCount === shown.length) coverage = "none";
-  else if (noDataCount > 0 || hadNull) coverage = "partial";
+  else if (!current || noDataCount > 0 || hadNull) coverage = "partial";
 
   // Ereignisse ueber [current, ...forecast].
   const seq = current ? [current, ...forecast] : [...forecast];
@@ -231,3 +253,4 @@ export function computeNowcast(series, now, config) {
     isolatedFrames,
   };
 }
+
