@@ -63,7 +63,9 @@ function buildDetail(nowcast) {
     return `Weiterer Schauer gegen ${hhmm(e.start)}, ${WORD[e.peakCategory]}.`;
   }
   if (events.length === 1 && events[0].startsNow && !events[0].openEnded) {
-    return "Danach trocken.";
+    return nowcast.coverage === "shortened"
+      ? `Danach trocken bis ${hhmm(nowcast.forecastUntil)}.`
+      : "Danach trocken.";
   }
   return null;
 }
@@ -80,6 +82,9 @@ function buildStatus(nowcast) {
     status = `Stand ${hhmm(stamp)}`;
   }
   if (ageUncertain) status += " (geschätzt)";
+  if (nowcast.coverage === "shortened") {
+    status += ` · Vorhersage bis ${hhmm(nowcast.forecastUntil)}`;
+  }
   return status;
 }
 
@@ -93,6 +98,9 @@ function buildTitle(nowcast) {
   const { coverage, events, isolatedFrames, current } = nowcast;
   if (coverage === "none") return "Keine Radardaten";
   if (events.length === 0) {
+    if (coverage === "shortened" && isolatedFrames.length === 0) {
+      return `Kein Regen bis ${hhmm(nowcast.forecastUntil)}`;
+    }
     return isolatedFrames.length > 0 ? "Kurzer Regen möglich" : coverage === "partial" ? "Vorhersage unvollständig" : "Kein Regen";
   }
   const e = events[0];
@@ -150,7 +158,9 @@ export function summarize(nowcast) {
       const f = isolatedFrames[0];
       headline = `Kurzer ${ADJ[f.category]} Regen (${fmtRate(f.rateMmh)} mm/h) möglich gegen ${hhmm(f.validTime)}.`;
     } else {
-      headline = "Kein Regen in den nächsten 2 Stunden.";
+      headline = coverage === "shortened"
+        ? `Kein Regen bis ${hhmm(nowcast.forecastUntil)}.`
+        : "Kein Regen in den nächsten 2 Stunden.";
     }
     return { title, icon, headline, detail: null, status };
   }
@@ -161,7 +171,10 @@ export function summarize(nowcast) {
     const word = WORD[current.category];
     const rate = fmtRate(current.rateMmh);
     if (e.openEnded) {
-      headline = `Es regnet gerade, ${word} (${rate} mm/h). Hält voraussichtlich die nächsten 2 Stunden an.`;
+      const until = coverage === "shortened"
+        ? `bis mindestens ${hhmm(nowcast.forecastUntil)}`
+        : "die nächsten 2 Stunden";
+      headline = `Es regnet gerade, ${word} (${rate} mm/h). Hält voraussichtlich ${until} an.`;
     } else {
       headline = `Es regnet gerade, ${word} (${rate} mm/h). Lässt voraussichtlich gegen ${hhmm(
         e.end
