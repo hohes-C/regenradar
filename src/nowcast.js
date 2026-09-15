@@ -190,7 +190,7 @@ export function computeNowcast(series, now, config) {
   const current = latest && now - latest.validTime < c.FRAME_MIN * MIN ? latest : null;
   const past = atOrBefore.length ? atOrBefore.slice(0, -1) : [];
   // Explizite Zeitslots: fehlende Frames bleiben sichtbar und stauchen die
-  // Zeitleiste nicht. Auch ein verkuerzter API-Horizont ist eine Datenluecke.
+  // Zeitleiste nicht. Slots nach dem Ende des Radar-Laufs bleiben ebenfalls leer.
   const step = c.FRAME_MIN * MIN;
   const anchor = sorted[0]?.validTime.getTime() ?? now.getTime();
   const first = anchor + (Math.floor((now.getTime() - anchor) / step) + 1) * step;
@@ -220,11 +220,21 @@ export function computeNowcast(series, now, config) {
 
   // Abdeckung ueber die dargestellten Frames (current + forecast).
   const shown = current ? [current, ...forecast] : [...forecast];
-  const noDataCount = shown.filter((f) => f.noData).length;
-  const hadNull = shown.some((f) => f.hadNull);
+  // Der DWD-Horizont beginnt am Lauf, nicht an der aktuellen Uhrzeit.
+  // Nur dieses bekannte Laufende darf fehlende Slots am Ende erklaeren.
+  // Fehlende Records innerhalb des Laufs bleiben echte Datenluecken.
+  const runEnd = runTime ? runTime.getTime() + c.HORIZON_MIN * MIN : null;
+  const forecastUntil = forecast.findLast((f) => !f.noData)?.validTime ?? null;
+  const shortened = runEnd !== null && runEnd > now.getTime() &&
+    runEnd < now.getTime() + c.HORIZON_MIN * MIN &&
+    forecastUntil !== null && forecastUntil.getTime() === runEnd;
+  const expected = shortened
+    ? shown.filter((f) => f.validTime.getTime() <= runEnd)
+    : shown;
   let coverage = "ok";
-  if (shown.length === 0 || noDataCount === shown.length) coverage = "none";
-  else if (!current || noDataCount > 0 || hadNull) coverage = "partial";
+  if (shown.length === 0 || shown.every((f) => f.noData)) coverage = "none";
+  else if (!current || expected.some((f) => f.noData || f.hadNull)) coverage = "partial";
+  else if (shortened) coverage = "shortened";
 
   // Ereignisse ueber [current, ...forecast].
   const seq = current ? [current, ...forecast] : [...forecast];
@@ -243,6 +253,7 @@ export function computeNowcast(series, now, config) {
     ageUncertain,
     freshness,
     coverage,
+    forecastUntil,
     center,
     coords: series.coords ?? null,
     current,

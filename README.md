@@ -135,6 +135,13 @@ wird dann als „Warnstatus unbekannt“ angezeigt, nicht als Entwarnung.
 
 Fehlende Radarintervalle erscheinen als Datenlücken in der Zeitleiste. Aussagen
 über zwei Stunden Trockenheit setzen ein vollständiges Vorhersagefenster voraus.
+Die 120 Minuten des DWD beginnen am Radar-Lauf, nicht am Abrufzeitpunkt. Reichen
+lückenlose Daten bis zu diesem Laufende, zeigt die App bei einem kürzeren
+Restzeitraum „Kein Regen bis HH:MM“ statt „Vorhersage unvollständig“. Die
+Statuszeile nennt das Vorhersageende. Leere Slots danach bleiben in der Zeitleiste
+sichtbar. Fehlende Intervalle innerhalb des Laufs, Nullwerte und ein unbekannter
+Laufzeitstempel werden weiterhin als Datenlücken behandelt. Alterswarnungen
+bleiben unabhängig davon erhalten.
 Regenereignisse werden nicht über unbekannte Intervalle verbunden. Aktueller
 Regen sowie einzelne intensive Frames oberhalb von `MODERATE_MAX_MMH` bleiben
 auch bei kurzer Dauer erhalten. Die Intensität berücksichtigt mindestens den
