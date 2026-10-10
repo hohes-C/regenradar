@@ -191,6 +191,38 @@ Einheit der Rohwerte: Niederschlag in 0,01 mm pro 5 Minuten. Ein Frame mit
 Zeitstempel T beschreibt das Intervall (T minus 5 Minuten, T]. mm/h = Wert ×
 0,12.
 
+## App-Icon
+
+Quelle sind die beiden SVG, die PNG werden daraus gerendert. Das Icon ist auf
+die Darstellungsarten von iOS ausgelegt, vor allem auf "Getönt" und "Klar"
+(Liquid Glass, ab iOS 26): dort fallen Farbton und Sättigung weg, übrig bleibt
+die Helligkeit. Daraus folgt der Aufbau:
+
+- sehr heller Tropfen (Weiß nach `#7fe1ff`) auf sehr dunklem Grund. Der Abstand
+  der mittleren Helligkeit liegt bei 0,76 von 1; vorher waren es 0,46.
+- eine große zusammenhängende Fläche statt dünner Linien, rund 21 % des
+  Quadrats, und keine Innenzeichnung. Die frühere Glanzellipse wurde in "Klar"
+  zu einem unscharfen Fleck.
+- randlos, ohne eigene Eckenrundung. iOS und Android legen ihre eigene Maske
+  darüber; eine mitgelieferte Rundung erzeugte darin ein zweites, sichtbares
+  Quadrat.
+
+Für Web-Apps gibt es keine getrennten Varianten für hell, dunkel, getönt und
+klar, wie sie native Apps über den Asset-Katalog mitgeben. iOS bekommt genau
+ein `apple-touch-icon` und leitet alle Darstellungsarten daraus ab, deshalb muss
+dieses eine Bild in allen vieren tragen.
+
+PNG nach einer Änderung an den SVG neu rendern, zum Beispiel mit librsvg:
+
+```sh
+for s in 180 192 512; do rsvg-convert -w $s -h $s icons/icon.svg -o icons/icon-$s.png; done
+rsvg-convert -w 512 -h 512 icons/icon-maskable.svg -o icons/icon-maskable-512.png
+```
+
+Jedes andere Werkzeug tut es auch, solange die Kantenlänge stimmt und die
+Dateien deckend bleiben: ein `apple-touch-icon` mit transparenten Flächen
+bekommt von iOS einen schwarzen Grund untergelegt.
+
 ## Deployment
 
 Beliebiges statisches Hosting mit HTTPS. Wichtig: `sw.js`, `manifest.webmanifest`
