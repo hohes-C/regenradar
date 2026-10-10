@@ -1,15 +1,21 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Regentropfen">
+  <!-- Auf die Darstellungsarten von iOS ausgelegt: in "Getoent" und "Klar"
+       zaehlt allein die Helligkeit, Farbton und Saettigung fallen weg. Deshalb
+       ein sehr heller Tropfen auf sehr dunklem Grund, grosse zusammenhaengende
+       Flaeche und keine Innenzeichnung. Randlos ohne eigene Eckenrundung: iOS
+       und Android legen ihre eigene Maske darueber.
+       Farben aus der App: Grund wie der Seitenverlauf, Tropfen wie die Kategorie "leicht". -->
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#1e3a8a" />
-      <stop offset="1" stop-color="#0b1020" />
+      <stop offset="0" stop-color="#2b2248" />
+      <stop offset="1" stop-color="#140e24" />
     </linearGradient>
-    <linearGradient id="drop" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#93c5fd" />
-      <stop offset="1" stop-color="#3b82f6" />
+    <linearGradient id="drop" x1="0.25" y1="0" x2="0.8" y2="1">
+      <stop offset="0" stop-color="#ffffff" />
+      <stop offset="1" stop-color="#7fe1ff" />
     </linearGradient>
   </defs>
-  <rect width="512" height="512" rx="112" fill="url(#bg)" />
-  <path fill="url(#drop)" d="M256 96 C 256 96, 152 236, 152 312 a104 104 0 0 0 208 0 C 360 236, 256 96, 256 96 Z" />
-  <ellipse cx="212" cy="300" rx="28" ry="42" fill="#ffffff" opacity="0.35" />
+  <rect width="512" height="512" fill="url(#bg)" />
+
+  <path fill="url(#drop)" d="M245.4 99.8a13 13 0 0 1 21.2 0L357.7 227.3A125 125 0 1 1 154.3 227.3Z" />
 </svg>
