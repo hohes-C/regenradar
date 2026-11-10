@@ -146,6 +146,24 @@ body[data-tab="alerts"] .view-alerts {
   width: 21px;
   height: 21px;
 }
+.topbar-actions {
+  display: flex;
+  gap: 8px;
+}
+/* Regenalarm eingeschaltet: Glocke gefuellt. */
+#push-btn[aria-pressed="true"] {
+  --bell-fill: currentColor;
+}
+.push-note {
+  flex: none;
+  margin: 8px 0 0;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.35;
+}
 .icon-btn[aria-pressed="true"] {
   background: rgba(255, 255, 255, 0.3);
 }

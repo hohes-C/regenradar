@@ -13,8 +13,19 @@ import {
   CURRENT_MAX_AGE_MIN,
   GEO_MAX_AGE_MS,
   GEO_TIMEOUT_MS,
+  PUSH_ALERT_WINDOW_MIN,
 } from "./config.js";
-import { render, renderAlerts, setTab, setAlertBadge, openPlaceForm, closePlaceForm } from "./ui.js";
+import {
+  render,
+  renderAlerts,
+  setTab,
+  setAlertBadge,
+  openPlaceForm,
+  closePlaceForm,
+  renderPush,
+  showPushNote,
+} from "./ui.js";
+import { pushConfigured, pushStatus, prefetchPushKey, enablePush, disablePush, syncPushPlace } from "./push.js";
 import { fetchAlerts } from "./alerts.js";
 import {
   loadPlaces,
@@ -161,6 +172,14 @@ async function loadAlerts(force = false, coords = activeCoords()) {
   }
 }
 
+// Der Regenalarm gilt fuer den Ort, an dem er eingeschaltet wurde, beim
+// automatischen Standort fuer die zuletzt bestimmte Position. push.js
+// entscheidet, ob der aktive Ort dazu gehoert, und meldet nur Aenderungen.
+function syncAlarmPlace() {
+  const coords = activeCoords();
+  if (coords) syncPushPlace({ id: state.activeId, lat: coords.lat, lon: coords.lon, name: placeName(state.activeId) });
+}
+
 // Anzeige gegen die aktuelle Uhr neu rechnen, ohne Netz. Ohne das haengen
 // Zeitleiste, Ticks und "jetzt" bis zur naechsten erfolgreichen Abfrage an der
 // Uhrzeit des letzten Abrufs.
@@ -211,6 +230,7 @@ async function resolveCurrent(coords, id, generation) {
   if (id === "geo" && data.stationName && state.geoName?.key !== key) {
     state.geoName = { key, name: data.stationName };
     saveGeoName(state.geoName);
+    syncAlarmPlace();
   }
   paint(baseView({ state: state.currentState }));
 }
@@ -266,6 +286,7 @@ async function load(force = false) {
         if (!isCurrent()) return;
         saveLast(id, series);
         renderResult(series, new Date());
+        syncAlarmPlace();
       } catch (err) {
         if (!isCurrent()) return;
         const offline = typeof navigator !== "undefined" && navigator.onLine === false;
@@ -375,7 +396,74 @@ async function refreshAll() {
   }
 }
 
+const PUSH_NOTES = {
+  needsInstall:
+    "Den Regenalarm gibt es auf dem iPhone nur in der App vom Home-Bildschirm: in Safari auf Teilen, dann „Zum Home-Bildschirm“.",
+  unsupported: "Dieser Browser kann keine Mitteilungen empfangen.",
+  denied: "Mitteilungen sind für diese App ausgeschaltet. Erlauben in den Einstellungen unter Mitteilungen.",
+  full: "Der Regenalarm-Dienst ist voll. Die Obergrenze steht in push/wrangler.toml.",
+  error: "Der Regenalarm konnte nicht eingerichtet werden. Bitte später noch einmal.",
+};
+
+// Zuletzt bekannter Status. Wird beim Tippen synchron gelesen: Safari verlangt,
+// dass die Berechtigungsabfrage direkt aus der Nutzeraktion kommt, ohne
+// asynchronen Zwischenschritt davor.
+let pushState = "hidden";
+let pushBusy = false;
+
+function setPush(status) {
+  pushState = status;
+  renderPush(status);
+}
+
+function togglePush() {
+  if (pushBusy) return;
+  // In den iOS-Einstellungen nachtraeglich erlaubt: synchron pruefbar, ohne Neuladen.
+  if (pushState === "denied" && Notification.permission !== "denied") pushState = "off";
+  if (PUSH_NOTES[pushState]) {
+    showPushNote(PUSH_NOTES[pushState]);
+    return;
+  }
+  const coords = activeCoords();
+  if (pushState !== "on" && !coords) {
+    showPushNote("Erst muss ein Ort bestimmt sein, dann kann der Regenalarm an.");
+    return;
+  }
+  pushBusy = true;
+  const wasOn = pushState === "on";
+  const name = placeName(state.activeId);
+  // enablePush ruft als Erstes, noch synchron, Notification.requestPermission().
+  const action = wasOn
+    ? disablePush().then(() => "off")
+    : enablePush({ id: state.activeId, lat: coords.lat, lon: coords.lon, name });
+  action
+    .then((result) => {
+      setPush(result);
+      if (result === "on") {
+        showPushNote(`Regenalarm ist an für ${name}: Mitteilung, wenn in den nächsten ${PUSH_ALERT_WINDOW_MIN} Minuten Regen kommt.`, 7000);
+      } else if (result === "denied") {
+        showPushNote(PUSH_NOTES.denied);
+      } else if (wasOn) {
+        showPushNote("Regenalarm ist aus.", 4000);
+      }
+    })
+    .catch(async (err) => {
+      showPushNote(err?.message === "full" ? PUSH_NOTES.full : PUSH_NOTES.error);
+      setPush(await pushStatus());
+    })
+    .finally(() => {
+      pushBusy = false;
+    });
+}
+
+async function initPush() {
+  if (!pushConfigured()) return;
+  setPush(await pushStatus());
+  prefetchPushKey();
+}
+
 function wireEvents() {
+  document.getElementById("push-btn").addEventListener("click", togglePush);
   document.getElementById("refresh").addEventListener("click", refreshAll);
   document.getElementById("alerts-refresh").addEventListener("click", refreshAll);
   document.getElementById("retry").addEventListener("click", refreshAll);
@@ -466,6 +554,7 @@ async function boot() {
   wireEvents();
   setTab(state.tab);
   activate(state.activeId);
+  initPush();
   if (document.visibilityState === "visible") startPolling();
 }
 

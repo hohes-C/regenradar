@@ -1,0 +1,29 @@
+# Regenalarm-Worker. Einrichtung Schritt fuer Schritt im README, Abschnitt
+# "Regenalarm (Web Push)".
+name = "regenradar-push"
+main = "src/index.js"
+compatibility_date = "2025-10-01"
+
+# Alle fuenf Minuten, im Takt der DWD-Radarlaeufe. Bright Sky bittet um
+# hoechstens eine Anfrage pro Ort und fuenf Minuten.
+[triggers]
+crons = ["*/5 * * * *"]
+
+# Ablage der Abos. Die id kommt aus: npx wrangler kv namespace create SUBS
+[[kv_namespaces]]
+binding = "SUBS"
+id = "KV_ID_HIER_EINTRAGEN"
+
+[vars]
+# Adresse der App (Schema und Host, ohne Pfad), mehrere mit Komma getrennt.
+# Nur von dort darf ein Abo angelegt werden.
+ALLOWED_ORIGINS = "https://regen.example.com"
+# Obergrenze fuer Abos. Der Gratistarif erlaubt pro Cron-Lauf 10 ms Rechenzeit
+# und 50 ausgehende Anfragen; jeder Ort kostet einen Radarabruf (~0,6 ms), jede
+# Mitteilung eine Anfrage (~1,3 ms). Zehn reichen fuer den privaten Gebrauch und
+# schuetzen das Kontingent, falls jemand Fremdes den Worker findet.
+MAX_SUBSCRIPTIONS = "10"
+
+# Secrets, nicht hier eintragen, sondern mit: npx wrangler secret put NAME
+#   VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY  aus: node scripts/vapid-keys.mjs
+#   VAPID_SUBJECT                       mailto:deine@adresse oder https://deine.seite

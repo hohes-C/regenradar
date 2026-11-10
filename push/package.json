@@ -1,0 +1,14 @@
+{
+  "name": "regenradar-push",
+  "private": true,
+  "type": "module",
+  "description": "Regenalarm per Web Push fuer das Regenradar. Cloudflare Worker mit Cron-Trigger.",
+  "scripts": {
+    "keys": "node scripts/vapid-keys.mjs",
+    "dev": "wrangler dev --test-scheduled",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "4.160.0"
+  }
+}

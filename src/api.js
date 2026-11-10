@@ -38,13 +38,13 @@ function iso(date) {
   return date.toISOString().replace(/\.\d{3}Z$/, "Z");
 }
 
-function buildUrl({ lat, lon, now }) {
+function buildUrl({ lat, lon, now, distance = DISTANCE_M }) {
   const date = new Date(now.getTime() - PAST_MIN * MIN);
   const lastDate = new Date(now.getTime() + (HORIZON_MIN + FRAME_MIN) * MIN);
   const params = new URLSearchParams({
     lat: String(lat),
     lon: String(lon),
-    distance: String(DISTANCE_M),
+    distance: String(distance),
     format: "plain",
     date: iso(date),
     last_date: iso(lastDate),
@@ -134,12 +134,14 @@ function normalize(data, now, coords) {
 }
 
 /**
- * @param {{ lat: number, lon: number, now: Date, fetchImpl?: typeof fetch }} args
+ * `distance` verkleinert den Ausschnitt fuer Aufrufer ohne Karte (Push-Worker);
+ * die App nutzt den vollen Ausschnitt.
+ * @param {{ lat: number, lon: number, now: Date, distance?: number, fetchImpl?: typeof fetch }} args
  * @returns {Promise<RadarSeries>}
  */
-export async function fetchRadarSeries({ lat, lon, now, fetchImpl }) {
+export async function fetchRadarSeries({ lat, lon, now, distance, fetchImpl }) {
   const doFetch = fetchImpl ?? globalThis.fetch;
-  const url = buildUrl({ lat, lon, now });
+  const url = buildUrl({ lat, lon, now, distance });
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);

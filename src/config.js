@@ -38,6 +38,13 @@ export const FETCH_TIMEOUT_MS = 10000;
 // DWD-Stationen melden stuendlich, ein deutlich aelterer Wert waere irrefuehrend.
 export const CURRENT_MAX_AGE_MIN = 120;
 
+// Regenalarm (Web Push). PUSH_URL ist die Adresse des Workers aus push/, z. B.
+// "https://regenradar-push.<konto>.workers.dev". Leer: Funktion ausgeblendet.
+export const PUSH_URL = "";
+export const PUSH_ALERT_WINDOW_MIN = 30; // Regen, der innerhalb so vieler Minuten beginnt, loest aus
+export const PUSH_COOLDOWN_MIN = 60; // fruehestens so lange nach einer Nachricht die naechste
+export const PUSH_RADAR_DISTANCE_M = 5000; // kleiner Ausschnitt: der Worker braucht keine Karte
+
 // Geolocation.
 export const GEO_MAX_AGE_MS = 300000; // maximumAge fuer Geolocation
 export const GEO_TIMEOUT_MS = 10000;

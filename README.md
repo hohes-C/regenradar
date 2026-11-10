@@ -17,6 +17,12 @@ Kein Backend, kein Framework, kein Bundler, keine Laufzeitabhängigkeiten. Plain
 HTML, CSS und ES-Module. Die App spricht direkt mit `api.brightsky.dev` und lädt
 Kartenkacheln von `tile.openstreetmap.org`.
 
+Optional: **Regenalarm** per Web Push. Dafür läuft ein kleiner Cloudflare Worker
+(`push/`), der alle fünf Minuten das Radar prüft und eine Mitteilung schickt,
+wenn Regen im Anmarsch ist. Die App selbst bleibt statisch; ohne Worker ist die
+Funktion ausgeblendet. Einrichtung im Abschnitt
+[Regenalarm (Web Push)](#regenalarm-web-push).
+
 ## Aufbau
 
 ```
@@ -33,7 +39,14 @@ src/
   places.js           gespeicherte Orte in localStorage
   ui.js               Rendering und DOM
   main.js             Bootstrap, Geolocation, Refresh-Logik
+  push.js             Regenalarm: Push-Abo anlegen, abmelden, Ort nachziehen
   debug.js            erzwingt UI-Zustände, nur bei ?state= geladen
+push/                 Regenalarm-Worker (Cloudflare), eigenes package.json
+  src/index.js        Endpunkte und Cron-Lauf
+  src/rain.js         wann alarmiert wird, Text der Mitteilung (rein)
+  src/webpush.js      Web Push nur mit WebCrypto: RFC 8291 und RFC 8292
+  scripts/vapid-keys.mjs  VAPID-Schlüsselpaar erzeugen
+  wrangler.toml       Cron, KV-Bindung, erlaubte App-Adresse
 icons/                icon.svg, icon-maskable.svg, PNG in 180/192/512 px
 scripts/explore.mjs   Erkundungsskript (Schritt 0)
 tests/                Node-Testrunner, keine Testbibliothek
@@ -186,10 +199,124 @@ im Code.
 | `GEO_MAX_AGE_MS` | 300000 | maximumAge für Geolocation (beim manuellen Aktualisieren 0) |
 | `GEO_TIMEOUT_MS` | 10000 | Timeout für Geolocation |
 | `COORD_DECIMALS` | 3 | Rundung der Koordinaten vor der Anfrage |
+| `PUSH_URL` | `""` | Adresse des Regenalarm-Workers; leer blendet die Funktion aus |
+| `PUSH_ALERT_WINDOW_MIN` | 30 | Regen, der innerhalb so vieler Minuten beginnt, löst aus |
+| `PUSH_COOLDOWN_MIN` | 60 | frühestens so lange nach einer Mitteilung die nächste |
+| `PUSH_RADAR_DISTANCE_M` | 5000 | Radarausschnitt des Workers (11 × 11 Pixel, ohne Karte) |
 
 Einheit der Rohwerte: Niederschlag in 0,01 mm pro 5 Minuten. Ein Frame mit
 Zeitstempel T beschreibt das Intervall (T minus 5 Minuten, T]. mm/h = Wert ×
 0,12.
+
+## Regenalarm (Web Push)
+
+Die Glocke oben rechts schaltet den Regenalarm für den Ort ein, der in der App
+gerade aktiv ist. Ein Cloudflare Worker prüft dann alle fünf Minuten das Radar
+und schickt eine Mitteilung, sobald Regen innerhalb von 30 Minuten beginnt,
+etwa „Mäßiger Regen in 20 Minuten · Nürnberg: ab 14:35, etwa 40 Minuten.“
+
+Aufbau nach dem Muster aus
+[„Web Push für interne Dienste“](https://hetzel.net/2026-11-05/web-push-fuer-interne-dienste/):
+Service Worker empfängt, die App meldet das Abo an, ein eigener Dienst
+verschickt mit VAPID-Schlüssel über den Push-Dienst des Browsers. Statt eines
+Go-Servers ist der Absender hier ein Cloudflare Worker mit Cron-Trigger und
+KV-Speicher, und statt einer Bibliothek übernimmt WebCrypto die Verschlüsselung.
+Die Entscheidung, wann es regnet, ist dieselbe Nowcast-Logik wie in der App
+(`src/nowcast.js`), Alarm und Anzeige widersprechen sich also nicht.
+
+### Einrichtung
+
+Voraussetzungen: kostenloses Cloudflare-Konto, Node 20 oder neuer.
+
+```sh
+cd push
+npm install                                   # holt Wrangler (Cloudflares CLI)
+npx wrangler login
+npx wrangler kv namespace create SUBS         # die ausgegebene id in wrangler.toml eintragen
+node scripts/vapid-keys.mjs                   # erzeugt das Schlüsselpaar
+npx wrangler secret put VAPID_PUBLIC_KEY      # Wert aus der vorigen Ausgabe
+npx wrangler secret put VAPID_PRIVATE_KEY     # Wert aus der vorigen Ausgabe
+npx wrangler secret put VAPID_SUBJECT         # mailto:deine@adresse oder https://deine.seite
+```
+
+In `push/wrangler.toml` bei `ALLOWED_ORIGINS` die Adresse der App eintragen
+(Schema und Host ohne Pfad, z. B. `https://regen.example.com`), dann:
+
+```sh
+npx wrangler deploy                           # gibt die Adresse des Workers aus
+```
+
+Die ausgegebene Adresse (`https://regenradar-push.<konto>.workers.dev`) in
+`src/config.js` bei `PUSH_URL` eintragen, **`CACHE_VERSION` in `sw.js` erhöhen**
+und die App neu ausliefern. Ohne die neue Cache-Version liefert der Service
+Worker weiter die alte `config.js` aus dem Cache und die Glocke bleibt aus.
+
+Auf dem iPhone: App vom Home-Bildschirm öffnen, Glocke tippen, Mitteilungen
+erlauben. Kurz darauf kommt „Regenalarm ist an“, damit ist der ganze Weg einmal
+geprüft. Ein neues Schlüsselpaar macht alle bestehenden Abos ungültig; dann die
+Glocke einmal aus- und wieder einschalten.
+
+### Verhalten
+
+- **Auslöser:** Regen, der innerhalb von `PUSH_ALERT_WINDOW_MIN` (30) Minuten
+  beginnt oder gerade begonnen hat. Tendenzen jenseits von 60 Minuten lösen
+  nicht aus, veraltete Radardaten auch nicht.
+- **Eine Mitteilung pro Regenphase.** Danach ist Ruhe, bis es trocken ist und
+  kein Regen mehr im Fenster liegt; die nächste kommt frühestens nach
+  `PUSH_COOLDOWN_MIN` (60) Minuten. Ein Nowcast, der an der Schwelle flackert,
+  erzeugt so keine Serie.
+- **Ort:** der Ort, an dem die Glocke eingeschaltet wurde. Nur mal bei einem
+  anderen Ort nachschauen verschiebt den Alarm nicht. Beim automatischen
+  Standort gilt die Position, die zuletzt bei geöffneter App bestimmt wurde: Web
+  Push kann den Standort nicht im Hintergrund nachverfolgen. Bewegt man sich
+  mit offener App, zieht die App den Alarm nach. Für einen anderen Ort die
+  Glocke aus- und dort wieder einschalten.
+- **Uhrzeiten** in der Zeitzone des Geräts. Der Worker selbst läuft in UTC und
+  bekommt die Zeitzone beim Abonnieren mitgeteilt.
+- **Nur auf dem Home-Bildschirm:** Auf iPhone und iPad gibt es Web Push nur in
+  einer Web-App, die zum Home-Bildschirm hinzugefügt wurde (ab iOS 16.4). In
+  Safari selbst erklärt die Glocke das, statt nichts zu tun.
+
+### Absicherung und Kosten
+
+- Abos nimmt der Worker nur von der Adresse in `ALLOWED_ORIGINS` an und nur bis
+  `MAX_SUBSCRIPTIONS` (10). Gesendet wird ausschließlich an die Push-Dienste von
+  Apple, Google, Mozilla und Microsoft, sonst ließe sich der Worker mit einem
+  erfundenen Abo als Weiterleitung missbrauchen.
+- Abgelaufene Abos (`404`/`410` vom Push-Dienst) löscht der Worker. Ausnahme:
+  Abos jünger als zehn Minuten. Googles Dienst meldete für ein brandneues Abo
+  einmal `410`, Sekunden später kam die Zustellung an dasselbe Abo durch.
+- **Gespeichert** wird bei Cloudflare je Abo: die Push-Adresse samt Schlüssel,
+  der Ort auf drei Nachkommastellen gerundet (etwa 100 m), sein Name und die
+  Zeitzone. Abschalten der Glocke löscht den Eintrag.
+- **Kosten:** Für ein paar Geräte reicht der Gratistarif. Ein Cron-Lauf alle
+  fünf Minuten sind 288 am Tag. Pro Lauf ein Radarabruf je Ort (nicht je Abo),
+  ein KV-`list` und ein `get` je Abo; geschrieben wird nur, wenn sich der
+  Zustand eines Abos ändert (KV erlaubt gratis 1.000 Schreibzugriffe am Tag).
+- **Rechenzeit:** Der Gratistarif erlaubt 10 ms je Lauf. In Node gemessen kostet
+  ein Ort etwa 0,6 ms (Radar auswerten), eine verschickte Mitteilung etwa 1,3 ms
+  (Verschlüsselung und Signatur). Ein gewöhnlicher Lauf liegt damit weit
+  darunter; eng wird es nur, wenn an mehreren Orten gleichzeitig Regen beginnt.
+  Bricht Cloudflare einen Lauf ab, sind die bis dahin verschickten Mitteilungen
+  samt Zustand gespeichert, der Rest folgt fünf Minuten später. Für mehr Geräte
+  hebt der bezahlte Workers-Tarif die Grenze auf.
+- Der Worker fragt Bright Sky mit `Accept-Encoding: gzip` ab. Ohne den Kopf
+  lehnt Bright Sky `format=plain` mit HTTP 400 ab; Browser schicken ihn immer,
+  die App ist davon nicht betroffen.
+
+### Lokal testen
+
+```sh
+cd push
+printf 'VAPID_PUBLIC_KEY=…\nVAPID_PRIVATE_KEY=…\nVAPID_SUBJECT=mailto:test@example.org\nALLOWED_ORIGINS=http://localhost:8000\n' > .dev.vars
+npm run dev                                   # wrangler dev --test-scheduled, Port 8787
+curl "http://localhost:8787/__scheduled?cron=*/5+*+*+*+*"   # einen Cron-Lauf auslösen
+```
+
+`.dev.vars` steht in `.gitignore`. Die Tests (`npm test` im Repo-Wurzelverzeichnis)
+prüfen die Verschlüsselung gegen das Beispiel aus RFC 8291, die Alarmlogik und
+den Worker mit nachgebautem KV, Radar und Push-Dienst, der die Mitteilung wie ein
+Browser entschlüsselt.
 
 ## App-Icon
 

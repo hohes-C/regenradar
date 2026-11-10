@@ -855,5 +855,32 @@ export function renderAlerts(view) {
   box.append(foot);
 }
 
+// Regenalarm: Glocke oben rechts und eine kurze Hinweiszeile darunter.
+const PUSH_LABEL = {
+  on: "Regenalarm ausschalten",
+  off: "Regenalarm einschalten",
+};
+
+/** status aus push.js: "hidden", "needsInstall", "unsupported", "denied", "off", "on". */
+export function renderPush(status) {
+  const btn = el("push-btn");
+  if (!btn) return;
+  btn.hidden = status === "hidden";
+  btn.setAttribute("aria-pressed", status === "on" ? "true" : "false");
+  btn.setAttribute("aria-label", PUSH_LABEL[status] ?? "Regenalarm");
+}
+
+let noteTimer = null;
+
+/** Hinweis zeigen. Mit `ms` blendet er sich selbst aus, sonst bleibt er bis zum naechsten. */
+export function showPushNote(text, ms = 0) {
+  const note = el("push-note");
+  if (!note) return;
+  clearTimeout(noteTimer);
+  note.textContent = text;
+  note.hidden = !text;
+  if (text && ms) noteTimer = setTimeout(() => (note.hidden = true), ms);
+}
+
 export { renderPlaces };
 

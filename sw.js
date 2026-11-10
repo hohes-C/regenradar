@@ -1,7 +1,7 @@
 // Service Worker. App-Shell cache-first, Bright Sky strikt network-only.
 // Bei jeder Aenderung an der Shell CACHE_VERSION erhoehen.
 
-const CACHE_VERSION = "regenradar-v17";
+const CACHE_VERSION = "regenradar-v18";
 
 const SHELL = [
   "./",
@@ -11,6 +11,7 @@ const SHELL = [
   "src/config.js",
   "src/api.js",
   "src/alerts.js",
+  "src/push.js",
   "src/nowcast.js",
   "src/text.js",
   "src/places.js",
@@ -79,3 +80,35 @@ self.addEventListener("fetch", (event) => {
   );
 });
 
+// Regenalarm: Nachricht des Push-Workers anzeigen. Jeder Push muss eine
+// sichtbare Mitteilung erzeugen; Safari entzieht sonst die Berechtigung.
+self.addEventListener("push", (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = { body: event.data ? event.data.text() : "" };
+  }
+  event.waitUntil(
+    self.registration.showNotification(data.title || "Regenradar", {
+      body: data.body || "",
+      tag: data.tag || "regenalarm",
+      renotify: true, // gleiche Kennung ersetzt die alte Mitteilung, meldet sich aber erneut
+      icon: "icons/icon-192.png",
+    })
+  );
+});
+
+// Tipp auf die Mitteilung: offenes Fenster der App nach vorn holen, sonst oeffnen.
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  event.waitUntil(
+    (async () => {
+      const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      for (const w of windows) {
+        if (w.url.startsWith(self.registration.scope) && "focus" in w) return w.focus();
+      }
+      return self.clients.openWindow(self.registration.scope);
+    })()
+  );
+});
